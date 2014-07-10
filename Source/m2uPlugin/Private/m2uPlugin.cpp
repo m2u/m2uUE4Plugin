@@ -16,8 +16,8 @@ bool GetActorByName( const TCHAR* Name, AActor* OutActor, UWorld* InWorld);
 void ExecuteCommand(const TCHAR* Str);
 
 Fm2uPlugin::Fm2uPlugin()
-:TcpListener(NULL),
-    Client(NULL)
+	:TcpListener(NULL),
+	 Client(NULL)
 {
 }
 
@@ -86,7 +86,7 @@ void Fm2uPlugin::Tick( float DeltaTime )
 		if( Client->Recv( Data.GetData(), Data.Num(), BytesRead) )
 		{
 			UE_LOG(LogM2U, Log, TEXT("DataNum %i, BytesRead: %i"), Data.Num(), BytesRead);
-			
+
 			// the data we receive is supposed to be ansi, but we will work with TCHAR, so we have to convert
 			int32 DestLen = TStringConvert<ANSICHAR,TCHAR>::ConvertedLength((char*)(Data.GetData()),Data.Num());
 			//UE_LOG(LogM2U, Log, TEXT("DestLen will be %i"), DestLen);
@@ -102,7 +102,7 @@ void Fm2uPlugin::Tick( float DeltaTime )
 
 			delete Dest;
 		}
-		
+
 		//if(	! Client->Send(Data, Count, BytesSent) )
 		//{
 		//	UE_LOG(LogM2U, Log, TEXT("server sending answer failed"));
@@ -146,7 +146,7 @@ void ExecuteCommand(const TCHAR* Str)
 	}
 	else if( FParse::Command(&Str, TEXT("TransformObject")))
 	{
-		const FString ActorName = FParse::Token(Str,0); 
+		const FString ActorName = FParse::Token(Str,0);
 		AActor* Actor = NULL;
 		UE_LOG(LogM2U, Log, TEXT("Searching for actor with name %s"), *ActorName);
 
@@ -155,7 +155,7 @@ void ExecuteCommand(const TCHAR* Str)
 			UE_LOG(LogM2U, Log, TEXT("Actor %s not found or invalid."), *ActorName);
 			return;
 		}
-	 
+
 		//UE_LOG(LogM2U, Log, TEXT("found actor"));
 
 		const TCHAR* Stream = Str;
@@ -205,13 +205,110 @@ void ExecuteCommand(const TCHAR* Str)
 	}
 	else if( FParse::Command(&Str, TEXT("SelectByName")))
 	{
-		const FString ActorName = FParse::Token(Str,0); 
-		AActor* Actor = GEditor->SelectNamedActor(*ActorName);		
+		const FString ActorName = FParse::Token(Str,0);
+		AActor* Actor = GEditor->SelectNamedActor(*ActorName);
+		GEditor->RedrawLevelEditingViewports();
 	}
+	else if( FParse::Command(&Str, TEXT("DeselectAll")))
+	{
+		GEditor->SelectNone(true, true, false);
+		GEditor->RedrawLevelEditingViewports();
+	}
+
+	// -- VISIBILITY --
+	// also see the "edactHide..." functions
+	// these functions currently do not write to the TransactionBuffer, so won't be undoable
+	else if( FParse::Command(&Str, TEXT("HideSelected")))
+	{
+		TArray<AActor*> SelectedActors;
+		USelection* Selection = GEditor->GetSelectedActors();
+		Selection->Modify();
+		Selection->GetSelectedObjects<AActor>(SelectedActors);
+
+		for( int32 Idx = 0 ; Idx < SelectedActors.Num() ; ++Idx )
+		{
+			AActor* Actor = SelectedActors[ Idx ];
+			// Don't consider already hidden actors or the builder brush
+			if( !FActorEditorUtils::IsABuilderBrush(Actor) && !Actor->IsHiddenEd() )
+			{
+				Actor->SetIsTemporarilyHiddenInEditor( true );
+			}
+		}
+		GEditor->RedrawLevelEditingViewports();
+	}
+	else if( FParse::Command(&Str, TEXT("UnhideSelected")))
+	{
+		TArray<AActor*> SelectedActors;
+		USelection* Selection = GEditor->GetSelectedActors();
+		Selection->Modify();
+		Selection->GetSelectedObjects<AActor>(SelectedActors);
+
+		for( int32 Idx = 0 ; Idx < SelectedActors.Num() ; ++Idx )
+		{
+			AActor* Actor = SelectedActors[ Idx ];
+			// Don't consider already visible actors or the builder brush
+			if( !FActorEditorUtils::IsABuilderBrush(Actor) && Actor->IsHiddenEd() )
+			{
+				Actor->SetIsTemporarilyHiddenInEditor( false );
+			}
+		}
+		GEditor->RedrawLevelEditingViewports();
+	}
+	else if( FParse::Command(&Str, TEXT("IsolateSelected")))
+	{
+		// Iterate through all of the actors and hide the ones which are not selected and are not already hidden
+		auto World = GEditor->GetEditorWorldContext().World();
+		for( FActorIterator It(World); It; ++It )
+		{
+			AActor* Actor = *It;
+			if( !FActorEditorUtils::IsABuilderBrush(Actor) && !Actor->IsSelected() && !Actor->IsHiddenEd() )
+			{
+				Actor->SetIsTemporarilyHiddenInEditor( true );
+			}
+		}
+		GEditor->RedrawLevelEditingViewports();
+	}
+	else if( FParse::Command(&Str, TEXT("UnhideAll")))
+	{
+		// Iterate through all of the actors and unhide them
+		auto World = GEditor->GetEditorWorldContext().World();
+		for( FActorIterator It(World); It; ++It )
+		{
+			AActor* Actor = *It;
+			if( !FActorEditorUtils::IsABuilderBrush(Actor) && Actor->IsTemporarilyHiddenInEditor() )
+			{
+				Actor->SetIsTemporarilyHiddenInEditor( false );
+			}
+		}
+		GEditor->RedrawLevelEditingViewports();
+	}
+
+	// -- CAMERA --
 	else if( FParse::Command(&Str, TEXT("TransformCamera")))
 	{
-		// this command is meant for viewports, not for camera Actors
-		
+		/* this command is meant for viewports, not for camera Actors */
+		const TCHAR* Stream = Str;
+		FVector Loc;
+		Stream = GetFVECTORSpaceDelimited( Stream, Loc );
+		// jump over the space
+		Stream = FCString::Strchr(Stream,' ');
+		if( Stream != NULL )
+		{
+			++Stream;
+		}
+		FRotator Rot;
+		Stream = GetFROTATORSpaceDelimited( Stream, Rot, 1.0f );
+
+		if( Stream != NULL )
+		{
+			for( int32 i=0; i<GEditor->LevelViewportClients.Num(); i++ )
+			{
+				GEditor->LevelViewportClients[i]->SetViewLocation( Loc );
+				GEditor->LevelViewportClients[i]->SetViewRotation( Rot );
+			}
+		}
+		GEditor->RedrawLevelEditingViewports();
+
 	}
 	else if( FParse::Command(&Str, TEXT("DuplicateObject")))
 	{
