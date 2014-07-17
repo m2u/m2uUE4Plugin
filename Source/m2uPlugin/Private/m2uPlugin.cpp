@@ -75,7 +75,7 @@ void Fm2uPlugin::Tick( float DeltaTime )
 	uint32 DataSize = 0;
 	while(Client->HasPendingData(DataSize) && DataSize > 0 )
 	{
-		UE_LOG(LogM2U, Log, TEXT("pending data size %i"), DataSize);
+		//UE_LOG(LogM2U, Log, TEXT("pending data size %i"), DataSize);
         // create data array to read from client
 		//FArrayReaderPtr Data = MakeShareable(new FArrayReader(true));
 		FArrayReader Data;
@@ -144,6 +144,45 @@ void ExecuteCommand(const TCHAR* Str)
 	{
 		GEditor->Exec(GEditor->GetEditorWorldContext().World(), Str);
 	}
+
+
+	// -- SELECTION --
+	else if( FParse::Command(&Str, TEXT("SelectByName")))
+	{
+		const FString ActorName = FParse::Token(Str,0);
+		AActor* Actor = GEditor->SelectNamedActor(*ActorName);
+		GEditor->RedrawLevelEditingViewports();
+	}
+	else if( FParse::Command(&Str, TEXT("DeselectAll")))
+	{
+		GEditor->SelectNone(true, true, false);
+		GEditor->RedrawLevelEditingViewports();
+	}
+	else if( FParse::Command(&Str, TEXT("DeselectByName")))
+	{
+		const FString ActorName = FParse::Token(Str,0);
+		TArray<AActor*> SelectedActors;
+		USelection* Selection = GEditor->GetSelectedActors();
+		Selection->GetSelectedObjects<AActor>(SelectedActors);
+
+		for( int32 Idx = 0 ; Idx < SelectedActors.Num() ; ++Idx )
+		{
+			AActor* Actor = SelectedActors[ Idx ];			
+			if(Actor->GetFName().ToString() == ActorName)
+			{
+				Selection->Modify();
+				//Selection->BeginBatchSelectOperation();
+				//Selection->Deselect(Actor);
+				//Selection->EndBatchSelectOperation();
+				GEditor->SelectActor( Actor, false, false ); // deselect
+				break;
+			}
+		}
+		GEditor->RedrawLevelEditingViewports();
+	}
+
+
+	// -- EDITING --
 	else if( FParse::Command(&Str, TEXT("TransformObject")))
 	{
 		const FString ActorName = FParse::Token(Str,0);
@@ -156,44 +195,58 @@ void ExecuteCommand(const TCHAR* Str)
 			return;
 		}
 
-		//UE_LOG(LogM2U, Log, TEXT("found actor"));
-
 		const TCHAR* Stream = Str;
 		if( Stream != NULL )
-		{
-			++Stream;
-		}
+		{	++Stream;  } // skip a space
 
-		//UE_LOG(LogM2U, Log, TEXT("before Loc %s"), Stream);
+		FString Temp; 
 		// get location
 		FVector Loc;
-		Stream = GetFVECTORSpaceDelimited( Stream, Loc );
-		//UE_LOG(LogM2U, Log, TEXT("Loc %s"), *(Loc.ToString()) );
-		// jump over the space
-		Stream = FCString::Strchr(Stream,' ');
-		if( Stream != NULL )
+		if( FParse::Value( Stream, TEXT("T=("), Temp, false) )
 		{
-			++Stream;
+			//Stream += 2; // skip T=
+			//Stream = GetFVECTORSpaceDelimited( Stream, Loc );
+			GetFVECTORSpaceDelimited( *Temp, Loc );
+			//UE_LOG(LogM2U, Log, TEXT("Loc %s"), *(Loc.ToString()) );
+			// jump over the space
+			//Stream = FCString::Strchr(Stream,' ');
+			//if( Stream != NULL )
+			//{	++Stream;  }
 		}
-		//UE_LOG(LogM2U, Log, TEXT("before Rot %s"), Stream);
+		else // no translate value in string
+		{
+			Loc = Actor->GetActorLocation();
+		}
+
 		// get rotation
 		FRotator Rot;
-		Stream = GetFROTATORSpaceDelimited( Stream, Rot, 1.0f );
-		//UE_LOG(LogM2U, Log, TEXT("Rot %s"), *(Rot.ToString()) );
-		// jump over the space
-		Stream = FCString::Strchr(Stream,' ');
-		if( Stream != NULL )
+		if( FParse::Value( Stream, TEXT("R=("), Temp, false) )
 		{
-			++Stream;
+			//Stream +=2;
+			//Stream = GetFROTATORSpaceDelimited( Stream, Rot, 1.0f );
+			GetFROTATORSpaceDelimited( *Temp, Rot, 1.0f );
+			//UE_LOG(LogM2U, Log, TEXT("Rot %s"), *(Rot.ToString()) );
+			// jump over the space
+			//Stream = FCString::Strchr(Stream,' ');
+			//if( Stream != NULL )
+			//{	++Stream;  }
 		}
-		//UE_LOG(LogM2U, Log, TEXT("before Scc %s"), Stream);
+		else // no rotate value in string
+		{
+			Rot = Actor->GetActorRotation();
+		}
+
 		// get scale
 		FVector Scale;
-		Stream = GetFVECTORSpaceDelimited( Stream, Scale );
-		//UE_LOG(LogM2U, Log, TEXT("Scc %s"), *(Scale.ToString()) );
+		if( FParse::Value( Stream, TEXT("S=("), Temp, false) )
+		{
+			//Stream = GetFVECTORSpaceDelimited( Stream, Scale );
+			GetFVECTORSpaceDelimited( *Temp, Scale );
+			//UE_LOG(LogM2U, Log, TEXT("Scc %s"), *(Scale.ToString()) );
+			Actor->SetActorScale3D( Scale );
+		}
 
 		Actor->TeleportTo( Loc, Rot, false, true);
-		Actor->SetActorScale3D( Scale );
 		Actor->InvalidateLightingCache();
 		// Call PostEditMove to update components, etc.
 		Actor->PostEditMove( true );
@@ -203,17 +256,25 @@ void ExecuteCommand(const TCHAR* Str)
 
 		GEditor->RedrawLevelEditingViewports();
 	}
-	else if( FParse::Command(&Str, TEXT("SelectByName")))
+	else if( FParse::Command(&Str, TEXT("DeleteSelected")))
 	{
-		const FString ActorName = FParse::Token(Str,0);
-		AActor* Actor = GEditor->SelectNamedActor(*ActorName);
-		GEditor->RedrawLevelEditingViewports();
 	}
-	else if( FParse::Command(&Str, TEXT("DeselectAll")))
+	else if( FParse::Command(&Str, TEXT("RenameObject")))
 	{
-		GEditor->SelectNone(true, true, false);
-		GEditor->RedrawLevelEditingViewports();
 	}
+	else if( FParse::Command(&Str, TEXT("DuplicateObject")))
+	{
+		/*Actor->InvalidateLightingCache();
+		// Call PostEditMove to update components, etc.
+		Actor->PostEditMove( true );
+		Actor->PostDuplicate(false);
+		Actor->CheckDefaultSubobjects();
+
+		// Request saves/refreshes.
+		Actor->MarkPackageDirty();*/
+	}
+	
+
 
 	// -- VISIBILITY --
 	// also see the "edactHide..." functions
@@ -283,6 +344,7 @@ void ExecuteCommand(const TCHAR* Str)
 		GEditor->RedrawLevelEditingViewports();
 	}
 
+
 	// -- CAMERA --
 	else if( FParse::Command(&Str, TEXT("TransformCamera")))
 	{
@@ -310,15 +372,13 @@ void ExecuteCommand(const TCHAR* Str)
 		GEditor->RedrawLevelEditingViewports();
 
 	}
-	else if( FParse::Command(&Str, TEXT("DuplicateObject")))
-	{
-		/*Actor->InvalidateLightingCache();
-		// Call PostEditMove to update components, etc.
-		Actor->PostEditMove( true );
-		Actor->PostDuplicate(false);
-		Actor->CheckDefaultSubobjects();
 
-		// Request saves/refreshes.
-		Actor->MarkPackageDirty();*/
-	}
+	// -- OTHER --
+	else if( FParse::Command(&Str, TEXT("Undo")))
+	{}
+	else if( FParse::Command(&Str, TEXT("Redo")))
+	{}
+	else if( FParse::Command(&Str, TEXT("GetFreeName")))
+	{}
+	
 }
