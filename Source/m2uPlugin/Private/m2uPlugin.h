@@ -15,8 +15,9 @@ public:
 	virtual void ShutdownModule() OVERRIDE;
 	bool HandleConnectionAccepted( FSocket* ClientSocket, const FIPv4Endpoint& ClientEndpoint);
 	void Tick( float DeltaTime );
+	void SendResponse( const FString& Message);
 
-private:
+protected:
 	FSocket* Client;
 	class FTcpListener* TcpListener;
 	Fm2uTickObject* TickObject;

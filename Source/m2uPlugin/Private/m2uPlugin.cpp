@@ -13,7 +13,7 @@ IMPLEMENT_MODULE( Fm2uPlugin, m2uPlugin )
 
 
 bool GetActorByName( const TCHAR* Name, AActor* OutActor, UWorld* InWorld);
-void ExecuteCommand(const TCHAR* Str);
+void ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn);
 
 Fm2uPlugin::Fm2uPlugin()
 	:TcpListener(NULL),
@@ -98,7 +98,7 @@ void Fm2uPlugin::Tick( float DeltaTime )
 			//UE_LOG(LogM2U, Log, TEXT("server received %s"), *Text);
 			UE_LOG(LogM2U, Log, TEXT("Server received: %s"), Dest);
 
-			ExecuteCommand(Dest);
+			ExecuteCommand(Dest, this);
 
 			delete Dest;
 		}
@@ -107,6 +107,26 @@ void Fm2uPlugin::Tick( float DeltaTime )
 		//{
 		//	UE_LOG(LogM2U, Log, TEXT("server sending answer failed"));
 		//}
+	}
+}
+
+void Fm2uPlugin::SendResponse(const FString& Message)
+{
+	if( Client == NULL)
+		return;
+
+	//const uint8* Data = *Message;
+	//const int32 Count = Message.Len();
+	int32 DestLen = TStringConvert<TCHAR,ANSICHAR>::ConvertedLength(*Message, Message.Len());
+	//UE_LOG(LogM2U, Log, TEXT("DestLen will be %i"), DestLen);
+	uint8* Dest = new uint8[DestLen+1];
+	TStringConvert<TCHAR,ANSICHAR>::Convert((ANSICHAR*)Dest, DestLen, *Message, Message.Len());
+	Dest[DestLen]='\0';
+
+	int32 BytesSent = 0;
+	if(	! Client->Send( Dest, DestLen, BytesSent) )
+	{
+		UE_LOG(LogM2U, Log, TEXT("server sending answer failed"));
 	}
 }
 
@@ -138,13 +158,17 @@ bool GetActorByName( const TCHAR* Name, AActor** OutActor, UWorld* InWorld = NUL
 	}
 }
 
-void ExecuteCommand(const TCHAR* Str)
+void ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 {
 	if( FParse::Command(&Str, TEXT("Exec")))
 	{
 		GEditor->Exec(GEditor->GetEditorWorldContext().World(), Str);
 	}
-
+	
+	else if( FParse::Command(&Str, TEXT("Test")))
+	{
+		Conn->SendResponse(TEXT("Hallo"));
+	}
 
 	// -- SELECTION --
 	else if( FParse::Command(&Str, TEXT("SelectByName")))
@@ -167,7 +191,7 @@ void ExecuteCommand(const TCHAR* Str)
 
 		for( int32 Idx = 0 ; Idx < SelectedActors.Num() ; ++Idx )
 		{
-			AActor* Actor = SelectedActors[ Idx ];			
+			AActor* Actor = SelectedActors[ Idx ];
 			if(Actor->GetFName().ToString() == ActorName)
 			{
 				Selection->Modify();
@@ -187,7 +211,7 @@ void ExecuteCommand(const TCHAR* Str)
 	{
 		const FString ActorName = FParse::Token(Str,0);
 		AActor* Actor = NULL;
-		UE_LOG(LogM2U, Log, TEXT("Searching for actor with name %s"), *ActorName);
+		UE_LOG(LogM2U, Log, TEXT("Searching for Actor with name %s"), *ActorName);
 
 		if(!GetActorByName(*ActorName, &Actor) || Actor == NULL)
 		{
@@ -195,23 +219,17 @@ void ExecuteCommand(const TCHAR* Str)
 			return;
 		}
 
-		const TCHAR* Stream = Str;
-		if( Stream != NULL )
-		{	++Stream;  } // skip a space
+		const TCHAR* Stream; // used for searching in Str
+		//if( Stream != NULL )
+		//{	++Stream;  } // skip a space
 
-		FString Temp; 
 		// get location
 		FVector Loc;
-		if( FParse::Value( Stream, TEXT("T=("), Temp, false) )
+		if( (Stream =  FCString::Strfind(Str,TEXT("T="))) )
 		{
-			//Stream += 2; // skip T=
-			//Stream = GetFVECTORSpaceDelimited( Stream, Loc );
-			GetFVECTORSpaceDelimited( *Temp, Loc );
+			Stream += 3; // skip "T=("
+			Stream = GetFVECTORSpaceDelimited( Stream, Loc );
 			//UE_LOG(LogM2U, Log, TEXT("Loc %s"), *(Loc.ToString()) );
-			// jump over the space
-			//Stream = FCString::Strchr(Stream,' ');
-			//if( Stream != NULL )
-			//{	++Stream;  }
 		}
 		else // no translate value in string
 		{
@@ -220,16 +238,11 @@ void ExecuteCommand(const TCHAR* Str)
 
 		// get rotation
 		FRotator Rot;
-		if( FParse::Value( Stream, TEXT("R=("), Temp, false) )
+		if( (Stream =  FCString::Strfind(Str,TEXT("R="))) )
 		{
-			//Stream +=2;
-			//Stream = GetFROTATORSpaceDelimited( Stream, Rot, 1.0f );
-			GetFROTATORSpaceDelimited( *Temp, Rot, 1.0f );
+			Stream += 3; // skip "R=("
+			Stream = GetFROTATORSpaceDelimited( Stream, Rot, 1.0f );
 			//UE_LOG(LogM2U, Log, TEXT("Rot %s"), *(Rot.ToString()) );
-			// jump over the space
-			//Stream = FCString::Strchr(Stream,' ');
-			//if( Stream != NULL )
-			//{	++Stream;  }
 		}
 		else // no rotate value in string
 		{
@@ -238,10 +251,10 @@ void ExecuteCommand(const TCHAR* Str)
 
 		// get scale
 		FVector Scale;
-		if( FParse::Value( Stream, TEXT("S=("), Temp, false) )
+		if( (Stream =  FCString::Strfind(Str,TEXT("S="))) )
 		{
-			//Stream = GetFVECTORSpaceDelimited( Stream, Scale );
-			GetFVECTORSpaceDelimited( *Temp, Scale );
+			Stream += 3; // skip "S=("
+			Stream = GetFVECTORSpaceDelimited( Stream, Scale );
 			//UE_LOG(LogM2U, Log, TEXT("Scc %s"), *(Scale.ToString()) );
 			Actor->SetActorScale3D( Scale );
 		}
@@ -258,6 +271,8 @@ void ExecuteCommand(const TCHAR* Str)
 	}
 	else if( FParse::Command(&Str, TEXT("DeleteSelected")))
 	{
+		auto World = GEditor->GetEditorWorldContext().World();
+		((UUnrealEdEngine*)GEditor)->edactDeleteSelected(World);
 	}
 	else if( FParse::Command(&Str, TEXT("RenameObject")))
 	{
@@ -273,7 +288,7 @@ void ExecuteCommand(const TCHAR* Str)
 		// Request saves/refreshes.
 		Actor->MarkPackageDirty();*/
 	}
-	
+
 
 
 	// -- VISIBILITY --
@@ -375,10 +390,14 @@ void ExecuteCommand(const TCHAR* Str)
 
 	// -- OTHER --
 	else if( FParse::Command(&Str, TEXT("Undo")))
-	{}
+	{
+		GEditor->UndoTransaction();
+	}
 	else if( FParse::Command(&Str, TEXT("Redo")))
-	{}
+	{
+		GEditor->RedoTransaction();
+	}
 	else if( FParse::Command(&Str, TEXT("GetFreeName")))
 	{}
-	
+
 }
