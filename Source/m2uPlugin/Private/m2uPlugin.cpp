@@ -141,6 +141,7 @@ bool GetActorByName( const TCHAR* Name, AActor** OutActor, UWorld* InWorld = NUL
 	AActor* Actor;
 	//OutActor = FindObject<AActor>( InWorld->GetCurrentLevel(), Name );
 	Actor = FindObject<AActor>( ANY_PACKAGE, Name, false );
+	// TODO: check if StaticFindObject or StaticFindObjectFastInternal is better
 	if( Actor == NULL ) // actor with that name cannot be found
 	{
 		return false;
@@ -164,7 +165,7 @@ void ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 	{
 		GEditor->Exec(GEditor->GetEditorWorldContext().World(), Str);
 	}
-	
+
 	else if( FParse::Command(&Str, TEXT("Test")))
 	{
 		Conn->SendResponse(TEXT("Hallo"));
@@ -279,14 +280,91 @@ void ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 	}
 	else if( FParse::Command(&Str, TEXT("DuplicateObject")))
 	{
-		/*Actor->InvalidateLightingCache();
-		// Call PostEditMove to update components, etc.
-		Actor->PostEditMove( true );
-		Actor->PostDuplicate(false);
-		Actor->CheckDefaultSubobjects();
+		const FString ActorName = FParse::Token(Str,0);
+		AActor* OrigActor = NULL;
+		AActor* Actor = NULL; // the duplicate
+		UE_LOG(LogM2U, Log, TEXT("Searching for Actor with name %s"), *ActorName);
 
-		// Request saves/refreshes.
-		Actor->MarkPackageDirty();*/
+		if(!GetActorByName(*ActorName, &OrigActor) || OrigActor == NULL)
+		{
+			UE_LOG(LogM2U, Log, TEXT("Actor %s not found or invalid."), *ActorName);
+			Conn->SendResponse(TEXT("1"));
+			return;
+		}
+
+		// jump over the next space
+		Str = FCString::Strchr(Str,' ');
+		if( Str != NULL)
+			Str++;
+
+		// the name that is desired for the object
+		const FString DupName = FParse::Token(Str,0);
+
+		const FScopedTransaction Transaction( NSLOCTEXT("UnrealEd", "DuplicateActors", "Duplicate Actors") );
+
+		// select only the actor we want to duplicate
+		GEditor->SelectNone(true, true, false);
+		OrigActor = GEditor->SelectNamedActor(*ActorName); // actor to duplicate
+		auto World = GEditor->GetEditorWorldContext().World();
+		((UUnrealEdEngine*)GEditor)->edactDuplicateSelected(World->GetCurrentLevel(), false);
+
+		// get the new actor (it will be auto-selected by the editor)
+		FSelectionIterator It( GEditor->GetSelectedActorIterator() );
+		Actor = static_cast<AActor*>( *It );
+
+
+		// if there are transform parameters, apply them
+		const TCHAR* Stream; // used for searching in Str
+		FVector Loc;
+		if( (Stream =  FCString::Strfind(Str,TEXT("T="))) )
+		{
+			Stream += 3; // skip "T=("
+			Stream = GetFVECTORSpaceDelimited( Stream, Loc );
+			//UE_LOG(LogM2U, Log, TEXT("Loc %s"), *(Loc.ToString()) );
+			Actor->SetActorLocation( Loc,false );
+		}
+
+		// get rotation
+		FRotator Rot;
+		if( (Stream =  FCString::Strfind(Str,TEXT("R="))) )
+		{
+			Stream += 3; // skip "R=("
+			Stream = GetFROTATORSpaceDelimited( Stream, Rot, 1.0f );
+			//UE_LOG(LogM2U, Log, TEXT("Rot %s"), *(Rot.ToString()) );
+			Actor->SetActorRotation( Rot,false );
+		}
+
+		// get scale
+		FVector Scale;
+		if( (Stream =  FCString::Strfind(Str,TEXT("S="))) )
+		{
+			Stream += 3; // skip "S=("
+			Stream = GetFVECTORSpaceDelimited( Stream, Scale );
+			//UE_LOG(LogM2U, Log, TEXT("Scc %s"), *(Scale.ToString()) );
+			Actor->SetActorScale3D( Scale );
+		}
+
+
+		// Try to set the actor's name to DupName
+		// note: a unique name was already assigned during the actual duplicate
+		// operation, we could just return that name instead and say "the editor
+		// changed the name" but if the DupName can be taken, it will save a lot of
+		// extra work on the program side which has to find a new name then.
+		GEditor->SetActorLabelUnique( Actor, DupName );
+		// get the editor-set name
+		const FString AssignedName = Actor->GetFName().ToString();
+		// if it is the desired name, everything went fine, if not,
+		// send the name as a response to the caller
+		if( AssignedName == DupName )
+		{
+			Conn->SendResponse(TEXT("0"));
+		}
+		else
+		{
+			Conn->SendResponse(FString::Printf( TEXT("3 %s"), *AssignedName ) );
+		}
+
+		GEditor->RedrawLevelEditingViewports();
 	}
 
 
