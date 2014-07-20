@@ -1,7 +1,7 @@
 #ifndef _M2UHELPER_H_
 #define _M2UHELPER_H_
 
-namespace m2u
+namespace m2uHelper
 {
 
 /**
@@ -38,7 +38,7 @@ namespace m2u
  * 'MakeUniqueObjectName'. The Actor's Label and ID are not guaranteed to match
  * when using 'SetActorLabel'.
  * 'MakeObjectNameFromActorLabel' will return a name, stripped of all invalid
- * characters. But if the names are the same, but the ID has a number suffix and
+ * characters. But if the names are the same, and the ID has a number suffix and
  * the label not, the returned name will not be changed.
  * (rename "Chair_5" to "Chair" will return "Chair_5" although I wanted "Chair")
  * So even using 'SetActorLabel' to set the FName to something unique, based
@@ -54,14 +54,51 @@ namespace m2u
  */
 	FName RenameActor( AActor* Actor, const FString& Name)
 	{
-		// create valid object name from the string.
-		// rename the object
-		// get the resulting name
-		// set the actor label to represent the ID
+		// 1. Generate a valid FName from the String
+
+		FString GeneratedName = Name;
+		// create valid object name from the string. (remove invalid characters)
+		for( int32 BadCharacterIndex = 0; BadCharacterIndex < ARRAY_COUNT( INVALID_OBJECTNAME_CHARACTERS ) - 1; ++BadCharacterIndex )
+		{
+			const TCHAR TestChar[2] = { INVALID_OBJECTNAME_CHARACTERS[ BadCharacterIndex ], 0 };
+			const int32 NumReplacedChars = GeneratedName.ReplaceInline( TestChar, TEXT( "" ) );
+		}
+		// is there still a name, or was it stripped completely (pure invalid name)
+		// we don't change the name then. The calling function should check
+		// this and maybe print an error-message or so.
+		if( GeneratedName.IsEmpty() )
+		{
+			return Actor->GetFName();
+		}
+		const FName NewFName( *GeneratedName );
 		
-	}
+		
+		// 2. Rename the object
+
+		if( Actor->GetFName() == NewFName )
+		{
+			// the new name and current name are the same. Either the input was 
+			// the same, or they differed by invalid chars.
+			return Actor->GetFName();
+		}
+
+		UObject* NewOuter = NULL; // NULL = use the current Outer
+		ERenameFlags RenFlags = REN_DontCreateRedirectors;
+		if( ! Actor->Rename( *NewFName.ToString(), NewOuter, RenFlags) )
+		{
+			// unable to rename the Actor
+			return Actor->GetFName();
+		}
+
+		// 3. Get the resulting name
+		const FName ResultFName = Actor->GetFName();
+		// 4. Set the actor label to represent the ID
+		//Actor->ActorLabel = ResultFName.ToString(); // ActorLabel is private :(
+		Actor->SetActorLabel(ResultFName.ToString()); // this won't change the ID
+		return ResultFName;
+	}// FName RenameActor()
 
 
 
-} // namespace m2u
+} // namespace m2uHelper
 #endif /* _M2UHELPER_H_ */

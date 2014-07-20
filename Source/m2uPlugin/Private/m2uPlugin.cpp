@@ -5,6 +5,8 @@
 #include "ActorEditorUtils.h"
 #include "UnrealEd.h"
 
+#include "m2uHelper.h"
+
 DEFINE_LOG_CATEGORY( LogM2U )
 
 #define DEFAULT_M2U_ENDPOINT FIPv4Endpoint(FIPv4Address(127,0,0,1), 3939)
@@ -300,7 +302,8 @@ void ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 		// the name that is desired for the object
 		const FString DupName = FParse::Token(Str,0);
 
-		const FScopedTransaction Transaction( NSLOCTEXT("UnrealEd", "DuplicateActors", "Duplicate Actors") );
+		// TODO: enable transactions
+		//const FScopedTransaction Transaction( NSLOCTEXT("UnrealEd", "DuplicateActors", "Duplicate Actors") );
 
 		// select only the actor we want to duplicate
 		GEditor->SelectNone(true, true, false);
@@ -331,7 +334,7 @@ void ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 			Stream += 3; // skip "R=("
 			Stream = GetFROTATORSpaceDelimited( Stream, Rot, 1.0f );
 			//UE_LOG(LogM2U, Log, TEXT("Rot %s"), *(Rot.ToString()) );
-			Actor->SetActorRotation( Rot,false );
+			Actor->SetActorRotation( Rot );
 		}
 
 		// get scale
