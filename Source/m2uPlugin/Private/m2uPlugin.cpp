@@ -279,6 +279,26 @@ void ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 	}
 	else if( FParse::Command(&Str, TEXT("RenameObject")))
 	{
+		const FString ActorName = FParse::Token(Str,0);
+		// jump over the next space
+		Str = FCString::Strchr(Str,' ');
+		if( Str != NULL)
+			Str++;
+		// the desired new name
+		const FString NewName = FParse::Token(Str,0);
+
+		// find the Actor
+		AActor* Actor = NULL;
+		if(!GetActorByName(*ActorName, &Actor) || Actor == NULL)
+		{
+			UE_LOG(LogM2U, Log, TEXT("Actor %s not found or invalid."), *ActorName);
+			Conn->SendResponse(TEXT("1"));
+			return;
+		}
+		
+		// try to rename the actor
+		const FName ResultName = m2uHelper::RenameActor(Actor, NewName);
+		// now send a response
 	}
 	else if( FParse::Command(&Str, TEXT("DuplicateObject")))
 	{
@@ -287,6 +307,7 @@ void ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 		AActor* Actor = NULL; // the duplicate
 		UE_LOG(LogM2U, Log, TEXT("Searching for Actor with name %s"), *ActorName);
 
+		// Find the Original to clone
 		if(!GetActorByName(*ActorName, &OrigActor) || OrigActor == NULL)
 		{
 			UE_LOG(LogM2U, Log, TEXT("Actor %s not found or invalid."), *ActorName);
@@ -294,7 +315,7 @@ void ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 			return;
 		}
 
-		// jump over the next space
+		// jump over the next space to find the name for the Duplicate
 		Str = FCString::Strchr(Str,' ');
 		if( Str != NULL)
 			Str++;
@@ -307,8 +328,10 @@ void ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 
 		// select only the actor we want to duplicate
 		GEditor->SelectNone(true, true, false);
-		OrigActor = GEditor->SelectNamedActor(*ActorName); // actor to duplicate
+		//OrigActor = GEditor->SelectNamedActor(*ActorName); // actor to duplicate
+		GEditor->SelectActor(OrigActor, true, false); 
 		auto World = GEditor->GetEditorWorldContext().World();
+		// Do the duplication
 		((UUnrealEdEngine*)GEditor)->edactDuplicateSelected(World->GetCurrentLevel(), false);
 
 		// get the new actor (it will be auto-selected by the editor)
@@ -316,7 +339,7 @@ void ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 		Actor = static_cast<AActor*>( *It );
 
 
-		// if there are transform parameters, apply them
+		// if there are transform parameters in the command, apply them
 		const TCHAR* Stream; // used for searching in Str
 		FVector Loc;
 		if( (Stream =  FCString::Strfind(Str,TEXT("T="))) )
@@ -349,11 +372,13 @@ void ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 
 
 		// Try to set the actor's name to DupName
-		// note: a unique name was already assigned during the actual duplicate
+		// NOTE: a unique name was already assigned during the actual duplicate
 		// operation, we could just return that name instead and say "the editor
 		// changed the name" but if the DupName can be taken, it will save a lot of
-		// extra work on the program side which has to find a new name then.
-		GEditor->SetActorLabelUnique( Actor, DupName );
+		// extra work on the program side which has to find a new name otherwise.
+		//GEditor->SetActorLabelUnique( Actor, DupName );
+		m2uHelper::RenameActor(Actor, DupName);
+
 		// get the editor-set name
 		const FString AssignedName = Actor->GetFName().ToString();
 		// if it is the desired name, everything went fine, if not,
