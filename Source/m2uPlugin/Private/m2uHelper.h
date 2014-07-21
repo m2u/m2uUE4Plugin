@@ -84,9 +84,14 @@ namespace m2uHelper
 
 		UObject* NewOuter = NULL; // NULL = use the current Outer
 		ERenameFlags RenFlags = REN_DontCreateRedirectors;
-		if( ! Actor->Rename( *NewFName.ToString(), NewOuter, RenFlags) )
+		bool bCanRename = Actor->Rename( *NewFName.ToString(), NewOuter, REN_Test | REN_DoNotDirty | REN_NonTransactional | RenFlags );
+		if( bCanRename )
 		{
-			// unable to rename the Actor
+			Actor->Rename( *NewFName.ToString(), NewOuter, RenFlags);
+		}
+		else
+		{
+			// unable to rename the Actor to that name
 			return Actor->GetFName();
 		}
 

@@ -15,7 +15,7 @@ IMPLEMENT_MODULE( Fm2uPlugin, m2uPlugin )
 
 
 bool GetActorByName( const TCHAR* Name, AActor* OutActor, UWorld* InWorld);
-void ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn);
+FString ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn);
 
 Fm2uPlugin::Fm2uPlugin()
 	:TcpListener(NULL),
@@ -87,7 +87,7 @@ void Fm2uPlugin::Tick( float DeltaTime )
         // read pending data into the Data array reader
 		if( Client->Recv( Data.GetData(), Data.Num(), BytesRead) )
 		{
-			UE_LOG(LogM2U, Log, TEXT("DataNum %i, BytesRead: %i"), Data.Num(), BytesRead);
+			//UE_LOG(LogM2U, Log, TEXT("DataNum %i, BytesRead: %i"), Data.Num(), BytesRead);
 
 			// the data we receive is supposed to be ansi, but we will work with TCHAR, so we have to convert
 			int32 DestLen = TStringConvert<ANSICHAR,TCHAR>::ConvertedLength((char*)(Data.GetData()),Data.Num());
@@ -98,17 +98,13 @@ void Fm2uPlugin::Tick( float DeltaTime )
 
 			//FString Text(Dest); // FString from tchar array
 			//UE_LOG(LogM2U, Log, TEXT("server received %s"), *Text);
-			UE_LOG(LogM2U, Log, TEXT("Server received: %s"), Dest);
+			//UE_LOG(LogM2U, Log, TEXT("Server received: %s"), Dest);
 
-			ExecuteCommand(Dest, this);
+			FString Result = ExecuteCommand(Dest, this);
+			SendResponse(Result);
 
 			delete Dest;
 		}
-
-		//if(	! Client->Send(Data, Count, BytesSent) )
-		//{
-		//	UE_LOG(LogM2U, Log, TEXT("server sending answer failed"));
-		//}
 	}
 }
 
@@ -161,16 +157,19 @@ bool GetActorByName( const TCHAR* Name, AActor** OutActor, UWorld* InWorld = NUL
 	}
 }
 
-void ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
+FString ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 {
 	if( FParse::Command(&Str, TEXT("Exec")))
 	{
-		GEditor->Exec(GEditor->GetEditorWorldContext().World(), Str);
+		if( GEditor->Exec(GEditor->GetEditorWorldContext().World(), Str) )
+			return TEXT("Ok");
+		else
+			return TEXT("Command unhandled.");
 	}
 
 	else if( FParse::Command(&Str, TEXT("Test")))
 	{
-		Conn->SendResponse(TEXT("Hallo"));
+		return TEXT("Hallo");
 	}
 
 	// -- SELECTION --
@@ -179,11 +178,15 @@ void ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 		const FString ActorName = FParse::Token(Str,0);
 		AActor* Actor = GEditor->SelectNamedActor(*ActorName);
 		GEditor->RedrawLevelEditingViewports();
+
+		return TEXT("Ok");
 	}
 	else if( FParse::Command(&Str, TEXT("DeselectAll")))
 	{
 		GEditor->SelectNone(true, true, false);
 		GEditor->RedrawLevelEditingViewports();
+		
+		return TEXT("Ok");
 	}
 	else if( FParse::Command(&Str, TEXT("DeselectByName")))
 	{
@@ -206,6 +209,7 @@ void ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 			}
 		}
 		GEditor->RedrawLevelEditingViewports();
+		return TEXT("Ok");
 	}
 
 
@@ -219,7 +223,7 @@ void ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 		if(!GetActorByName(*ActorName, &Actor) || Actor == NULL)
 		{
 			UE_LOG(LogM2U, Log, TEXT("Actor %s not found or invalid."), *ActorName);
-			return;
+			return TEXT("1");
 		}
 
 		const TCHAR* Stream; // used for searching in Str
@@ -271,11 +275,14 @@ void ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 		Actor->MarkPackageDirty();
 
 		GEditor->RedrawLevelEditingViewports();
+		return TEXT("Ok");
 	}
 	else if( FParse::Command(&Str, TEXT("DeleteSelected")))
 	{
 		auto World = GEditor->GetEditorWorldContext().World();
 		((UUnrealEdEngine*)GEditor)->edactDeleteSelected(World);
+
+		return TEXT("Ok");
 	}
 	else if( FParse::Command(&Str, TEXT("RenameObject")))
 	{
@@ -292,13 +299,12 @@ void ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 		if(!GetActorByName(*ActorName, &Actor) || Actor == NULL)
 		{
 			UE_LOG(LogM2U, Log, TEXT("Actor %s not found or invalid."), *ActorName);
-			Conn->SendResponse(TEXT("1"));
-			return;
+			return TEXT("1"); // NOT FOUND
 		}
 		
 		// try to rename the actor
 		const FName ResultName = m2uHelper::RenameActor(Actor, NewName);
-		// now send a response
+		return ResultName.ToString();
 	}
 	else if( FParse::Command(&Str, TEXT("DuplicateObject")))
 	{
@@ -311,8 +317,7 @@ void ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 		if(!GetActorByName(*ActorName, &OrigActor) || OrigActor == NULL)
 		{
 			UE_LOG(LogM2U, Log, TEXT("Actor %s not found or invalid."), *ActorName);
-			Conn->SendResponse(TEXT("1"));
-			return;
+			return TEXT("1"); // original not found
 		}
 
 		// jump over the next space to find the name for the Duplicate
@@ -338,6 +343,8 @@ void ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 		FSelectionIterator It( GEditor->GetSelectedActorIterator() );
 		Actor = static_cast<AActor*>( *It );
 
+		if( ! Actor )
+			return TEXT("4"); // duplication failed?
 
 		// if there are transform parameters in the command, apply them
 		const TCHAR* Stream; // used for searching in Str
@@ -370,6 +377,7 @@ void ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 			Actor->SetActorScale3D( Scale );
 		}
 
+		GEditor->RedrawLevelEditingViewports();
 
 		// Try to set the actor's name to DupName
 		// NOTE: a unique name was already assigned during the actual duplicate
@@ -385,14 +393,15 @@ void ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 		// send the name as a response to the caller
 		if( AssignedName == DupName )
 		{
-			Conn->SendResponse(TEXT("0"));
+			//Conn->SendResponse(TEXT("0"));
+			return TEXT("0");
 		}
 		else
 		{
-			Conn->SendResponse(FString::Printf( TEXT("3 %s"), *AssignedName ) );
+			//Conn->SendResponse(FString::Printf( TEXT("3 %s"), *AssignedName ) );
+			return FString::Printf( TEXT("3 %s"), *AssignedName );
 		}
 
-		GEditor->RedrawLevelEditingViewports();
 	}
 
 
@@ -417,6 +426,7 @@ void ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 			}
 		}
 		GEditor->RedrawLevelEditingViewports();
+		return TEXT("Ok");
 	}
 	else if( FParse::Command(&Str, TEXT("UnhideSelected")))
 	{
@@ -435,6 +445,7 @@ void ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 			}
 		}
 		GEditor->RedrawLevelEditingViewports();
+		return TEXT("Ok");
 	}
 	else if( FParse::Command(&Str, TEXT("IsolateSelected")))
 	{
@@ -449,6 +460,7 @@ void ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 			}
 		}
 		GEditor->RedrawLevelEditingViewports();
+		return TEXT("Ok");
 	}
 	else if( FParse::Command(&Str, TEXT("UnhideAll")))
 	{
@@ -463,6 +475,7 @@ void ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 			}
 		}
 		GEditor->RedrawLevelEditingViewports();
+		return TEXT("Ok");
 	}
 
 
@@ -491,19 +504,27 @@ void ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 			}
 		}
 		GEditor->RedrawLevelEditingViewports();
-
+		return TEXT("Ok");
 	}
 
 	// -- OTHER --
 	else if( FParse::Command(&Str, TEXT("Undo")))
 	{
 		GEditor->UndoTransaction();
+		return TEXT("Ok");
 	}
 	else if( FParse::Command(&Str, TEXT("Redo")))
 	{
 		GEditor->RedoTransaction();
+		return TEXT("Ok");
 	}
 	else if( FParse::Command(&Str, TEXT("GetFreeName")))
-	{}
+	{
+		return TEXT("Ok");
+	}
+	else
+	{
+		return TEXT("Command Not Found");
+	}
 
 }
