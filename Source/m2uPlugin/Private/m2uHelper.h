@@ -1,6 +1,9 @@
 #ifndef _M2UHELPER_H_
 #define _M2UHELPER_H_
 
+
+// Provides functions that are used by most likely more than one command or action
+
 namespace m2uHelper
 {
 
@@ -160,6 +163,67 @@ namespace m2uHelper
 		return TestName;
 
 	}// FName GetFreeName()
+
+	
+/**
+ * void SetActorTransformRelativeFromText(AActor* Actor, const TCHAR* Stream)
+ *
+ * Set the Actors relative transformations to the values provided in text-form
+ * T=(x y z) R=(x y z) S=(x y z)
+ * If one or more of T, R or S is not present in the String, they will be ignored.
+ *
+ * Relative transformations are the actual transformation values you see in the 
+ * Editor. They are equivalent to object-space transforms in maya for example.
+ *
+ * Setting world-space transforms using SetActorLocation or so will yield fucked
+ * up results when using nested transforms (parenting actors).
+ *
+ * The Actor has to be valid, so check before calling this function!
+ */
+	void SetActorTransformRelativeFromText(AActor* Actor, const TCHAR* Str)
+	{
+		const TCHAR* Stream; // used for searching in Str
+		//if( Stream != NULL )
+		//{	++Stream;  } // skip a space
+
+		// get location
+		FVector Loc;
+		if( (Stream =  FCString::Strfind(Str,TEXT("T="))) )
+		{
+			Stream += 3; // skip "T=("
+			Stream = GetFVECTORSpaceDelimited( Stream, Loc );
+			//UE_LOG(LogM2U, Log, TEXT("Loc %s"), *(Loc.ToString()) );
+			Actor->SetActorRelativeLocation( Loc, false );
+		}
+
+		// get rotation
+		FRotator Rot;
+		if( (Stream =  FCString::Strfind(Str,TEXT("R="))) )
+		{
+			Stream += 3; // skip "R=("
+			Stream = GetFROTATORSpaceDelimited( Stream, Rot, 1.0f );
+			//UE_LOG(LogM2U, Log, TEXT("Rot %s"), *(Rot.ToString()) );
+			Actor->SetActorRelativeRotation( Rot, false );
+		}
+
+		// get scale
+		FVector Scale;
+		if( (Stream =  FCString::Strfind(Str,TEXT("S="))) )
+		{
+			Stream += 3; // skip "S=("
+			Stream = GetFVECTORSpaceDelimited( Stream, Scale );
+			//UE_LOG(LogM2U, Log, TEXT("Scc %s"), *(Scale.ToString()) );
+			Actor->SetActorRelativeScale3D( Scale );
+		}
+
+		Actor->InvalidateLightingCache();
+		// Call PostEditMove to update components, etc.
+		Actor->PostEditMove( true );
+		Actor->CheckDefaultSubobjects();
+		// Request saves/refreshes.
+		Actor->MarkPackageDirty();
+
+	}// void SetActorTransformRelativeFromText()
 
 
 } // namespace m2uHelper

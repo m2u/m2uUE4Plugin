@@ -226,53 +226,7 @@ FString ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 			return TEXT("1");
 		}
 
-		const TCHAR* Stream; // used for searching in Str
-		//if( Stream != NULL )
-		//{	++Stream;  } // skip a space
-
-		// get location
-		FVector Loc;
-		if( (Stream =  FCString::Strfind(Str,TEXT("T="))) )
-		{
-			Stream += 3; // skip "T=("
-			Stream = GetFVECTORSpaceDelimited( Stream, Loc );
-			//UE_LOG(LogM2U, Log, TEXT("Loc %s"), *(Loc.ToString()) );
-		}
-		else // no translate value in string
-		{
-			Loc = Actor->GetActorLocation();
-		}
-
-		// get rotation
-		FRotator Rot;
-		if( (Stream =  FCString::Strfind(Str,TEXT("R="))) )
-		{
-			Stream += 3; // skip "R=("
-			Stream = GetFROTATORSpaceDelimited( Stream, Rot, 1.0f );
-			//UE_LOG(LogM2U, Log, TEXT("Rot %s"), *(Rot.ToString()) );
-		}
-		else // no rotate value in string
-		{
-			Rot = Actor->GetActorRotation();
-		}
-
-		// get scale
-		FVector Scale;
-		if( (Stream =  FCString::Strfind(Str,TEXT("S="))) )
-		{
-			Stream += 3; // skip "S=("
-			Stream = GetFVECTORSpaceDelimited( Stream, Scale );
-			//UE_LOG(LogM2U, Log, TEXT("Scc %s"), *(Scale.ToString()) );
-			Actor->SetActorScale3D( Scale );
-		}
-
-		Actor->TeleportTo( Loc, Rot, false, true);
-		Actor->InvalidateLightingCache();
-		// Call PostEditMove to update components, etc.
-		Actor->PostEditMove( true );
-		Actor->CheckDefaultSubobjects();
-		// Request saves/refreshes.
-		Actor->MarkPackageDirty();
+		m2uHelper::SetActorTransformRelativeFromText(Actor, Str);
 
 		GEditor->RedrawLevelEditingViewports();
 		return TEXT("Ok");
@@ -365,35 +319,7 @@ FString ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 			return TEXT("4"); // duplication failed?
 
 		// if there are transform parameters in the command, apply them
-		const TCHAR* Stream; // used for searching in Str
-		FVector Loc;
-		if( (Stream =  FCString::Strfind(Str,TEXT("T="))) )
-		{
-			Stream += 3; // skip "T=("
-			Stream = GetFVECTORSpaceDelimited( Stream, Loc );
-			//UE_LOG(LogM2U, Log, TEXT("Loc %s"), *(Loc.ToString()) );
-			Actor->SetActorLocation( Loc,false );
-		}
-
-		// get rotation
-		FRotator Rot;
-		if( (Stream =  FCString::Strfind(Str,TEXT("R="))) )
-		{
-			Stream += 3; // skip "R=("
-			Stream = GetFROTATORSpaceDelimited( Stream, Rot, 1.0f );
-			//UE_LOG(LogM2U, Log, TEXT("Rot %s"), *(Rot.ToString()) );
-			Actor->SetActorRotation( Rot );
-		}
-
-		// get scale
-		FVector Scale;
-		if( (Stream =  FCString::Strfind(Str,TEXT("S="))) )
-		{
-			Stream += 3; // skip "S=("
-			Stream = GetFVECTORSpaceDelimited( Stream, Scale );
-			//UE_LOG(LogM2U, Log, TEXT("Scc %s"), *(Scale.ToString()) );
-			Actor->SetActorScale3D( Scale );
-		}
+		m2uHelper::SetActorTransformRelativeFromText(Actor, Str);
 
 		GEditor->RedrawLevelEditingViewports();
 
