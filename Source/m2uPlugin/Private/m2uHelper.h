@@ -5,6 +5,8 @@ namespace m2uHelper
 {
 
 /**
+ * FName RenameActor( AActor* Actor, const FString& Name)
+ *
  * Tries to set the Actor's FName to the desired name, while also setting the Label
  * to the exact same name as the FName has resulted in.
  * The returned FName may differ from the desired name, if that was not valid or
@@ -71,13 +73,13 @@ namespace m2uHelper
 			return Actor->GetFName();
 		}
 		const FName NewFName( *GeneratedName );
-		
-		
+
+
 		// 2. Rename the object
 
 		if( Actor->GetFName() == NewFName )
 		{
-			// the new name and current name are the same. Either the input was 
+			// the new name and current name are the same. Either the input was
 			// the same, or they differed by invalid chars.
 			return Actor->GetFName();
 		}
@@ -103,6 +105,61 @@ namespace m2uHelper
 		return ResultFName;
 	}// FName RenameActor()
 
+
+
+/**
+ * FName GetFreeName(const FString& Name)
+ *
+ * Will find a free (unused) name based on the Name string provided.
+ * This will be achieved by increasing or adding a number-suffix until the
+ * name is unique.
+ *
+ * @param Name A name string with or without a number suffix on which to build onto.
+ */
+	FName GetFreeName(const FString& Name)
+	{
+		// Generate a valid FName from the String
+
+		FString GeneratedName = Name;
+		// create valid object name from the string. (remove invalid characters)
+		for( int32 BadCharacterIndex = 0; BadCharacterIndex < ARRAY_COUNT(
+				 INVALID_OBJECTNAME_CHARACTERS ) - 1; ++BadCharacterIndex )
+		{
+			const TCHAR TestChar[2] = { INVALID_OBJECTNAME_CHARACTERS[
+					BadCharacterIndex ], 0 };
+			const int32 NumReplacedChars = GeneratedName.ReplaceInline( TestChar,
+																		TEXT( "" ) );
+		}
+
+		FName TestName( *GeneratedName );
+
+		// TODO: maybe check only inside the current level or so?
+		UObject* Outer = ANY_PACKAGE;
+		UObject* ExistingObject;
+
+		// increase the suffix until there is no ExistingObject found
+		for(;;)
+		{
+			if (Outer == ANY_PACKAGE)
+			{
+				ExistingObject = StaticFindObject( NULL, ANY_PACKAGE,
+												   *TestName.ToString() );
+			}
+			else
+			{
+				ExistingObject = StaticFindObjectFastInternal( NULL, Outer, 
+															   TestName );
+			}
+			
+			if( ! ExistingObject ) // current name is not in use
+				break;
+			// increase suffix
+			//TestName = FName(TestName.GetIndex(), TestName.GetNumber() + 1 );
+			TestName.SetNumber( TestName.GetNumber() + 1 );
+		}
+		return TestName;
+
+	}// FName GetFreeName()
 
 
 } // namespace m2uHelper

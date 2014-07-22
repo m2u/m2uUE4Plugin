@@ -185,7 +185,7 @@ FString ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 	{
 		GEditor->SelectNone(true, true, false);
 		GEditor->RedrawLevelEditingViewports();
-		
+
 		return TEXT("Ok");
 	}
 	else if( FParse::Command(&Str, TEXT("DeselectByName")))
@@ -301,7 +301,7 @@ FString ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 			UE_LOG(LogM2U, Log, TEXT("Actor %s not found or invalid."), *ActorName);
 			return TEXT("1"); // NOT FOUND
 		}
-		
+
 		// try to rename the actor
 		const FName ResultName = m2uHelper::RenameActor(Actor, NewName);
 		return ResultName.ToString();
@@ -334,7 +334,7 @@ FString ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 		// select only the actor we want to duplicate
 		GEditor->SelectNone(true, true, false);
 		//OrigActor = GEditor->SelectNamedActor(*ActorName); // actor to duplicate
-		GEditor->SelectActor(OrigActor, true, false); 
+		GEditor->SelectActor(OrigActor, true, false);
 		auto World = GEditor->GetEditorWorldContext().World();
 		// Do the duplication
 		((UUnrealEdEngine*)GEditor)->edactDuplicateSelected(World->GetCurrentLevel(), false);
@@ -520,8 +520,27 @@ FString ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 	}
 	else if( FParse::Command(&Str, TEXT("GetFreeName")))
 	{
+		const FString InName = FParse::Token(Str,0);
+		FName FreeName = m2uHelper::GetFreeName(InName);
+		return FreeName.ToString();
+	}
+
+
+	// -- EXPORTING --
+
+	// fast fetching exports the selected objects simply into an fbx (or obj) file
+	else if( FParse::Command(&Str, TEXT("FetchSelected")))
+	{
+		// extract quoted file-path
+		const FString FilePath = FParse::Token(Str,0);
+		auto World = GEditor->GetEditorWorldContext().World();
+		GEditor->ExportMap(World, *FilePath, true);
 		return TEXT("Ok");
 	}
+
+
+
+
 	else
 	{
 		return TEXT("Command Not Found");
