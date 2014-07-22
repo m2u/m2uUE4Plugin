@@ -284,6 +284,24 @@ FString ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 
 		return TEXT("Ok");
 	}
+	else if( FParse::Command(&Str, TEXT("DeleteObject")))
+	{
+		// deletion of actors in the editor is a dangerous/complex task as actors
+		// can be brushes or referenced, levels need to be dirtied and so on
+		// there are no "deleteActor" functions in the Editor, only "DeleteSelected"
+		// since in most cases a deletion is preceded by a selection, and followed by
+		// a selection change, we don't bother and just select the object to delete
+		// and use the editor function to do it.
+		// TODO: maybe we could reselect the previous selection after the delete op
+		// but this is probably in 99% of the cases not necessary
+		GEditor->SelectNone(true, true, false);
+		const FString ActorName = FParse::Token(Str,0);
+		AActor* Actor = GEditor->SelectNamedActor(*ActorName);
+		auto World = GEditor->GetEditorWorldContext().World();
+		((UUnrealEdEngine*)GEditor)->edactDeleteSelected(World);
+		
+		return TEXT("Ok");
+	}
 	else if( FParse::Command(&Str, TEXT("RenameObject")))
 	{
 		const FString ActorName = FParse::Token(Str,0);
@@ -402,6 +420,64 @@ FString ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 			return FString::Printf( TEXT("3 %s"), *AssignedName );
 		}
 
+	}
+
+	else if( FParse::Command(&Str, TEXT("ParentChildTo")))
+	{
+		const FString ChildName = FParse::Token(Str,0);
+		Str = FCString::Strchr(Str,' ');
+		FString ParentName;
+		if( Str != NULL) // there may be a parent name present
+		{
+			Str++;
+			if( *Str != '\0' ) // there was a space, but no name after that
+			{
+				ParentName = FParse::Token(Str,0);				
+			}
+		}
+		
+		AActor* ChildActor = NULL;		
+		if(!GetActorByName(*ChildName, &ChildActor) || ChildActor == NULL)
+		{
+			UE_LOG(LogM2U, Log, TEXT("Actor %s not found or invalid."), *ChildName);
+			return TEXT("1");
+		}
+		
+		// TODO: enable transaction?
+		//const FScopedTransaction Transaction( NSLOCTEXT("Editor", "UndoAction_PerformAttachment", "Attach actors") );
+
+		// parent to world, aka "detach"
+		if( ParentName.Len() < 1) // no valid parent name
+		{
+			USceneComponent* ChildRoot = ChildActor->GetRootComponent();
+			if(ChildRoot->AttachParent != NULL)
+			{
+				UE_LOG(LogM2U, Log, TEXT("Parenting %s the World."), *ChildName);
+				AActor* OldParentActor = ChildRoot->AttachParent->GetOwner();
+				OldParentActor->Modify();
+				ChildRoot->DetachFromParent(true);
+				//ChildActor->SetFolderPath(OldParentActor->GetFolderPath());
+
+				GEngine->BroadcastLevelActorDetached(ChildActor, OldParentActor);
+			}
+			return TEXT("0");
+		}
+		
+		AActor* ParentActor = NULL;
+		if(!GetActorByName(*ParentName, &ParentActor) || ParentActor == NULL)
+		{
+			UE_LOG(LogM2U, Log, TEXT("Actor %s not found or invalid."), *ParentName);
+			return TEXT("1");
+		}							
+		if( ParentActor == ChildActor ) // can't parent actor to itself
+		{
+			return TEXT("1");
+		}
+		// parent to other actor, aka "attach"
+		UE_LOG(LogM2U, Log, TEXT("Parenting %s to %s."), *ChildName, *ParentName);
+		GEditor->ParentActors( ParentActor, ChildActor, NAME_None);
+		
+		return TEXT("0");
 	}
 
 
