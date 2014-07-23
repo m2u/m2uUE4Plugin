@@ -4,8 +4,11 @@
 
 // Provides functions that are used by most likely more than one command or action
 
+
 namespace m2uHelper
 {
+
+	const FString M2U_GENERATED_NAME(TEXT("m2uGeneratedName"));
 
 /**
  * FName RenameActor( AActor* Actor, const FString& Name)
@@ -75,7 +78,16 @@ namespace m2uHelper
 		{
 			return Actor->GetFName();
 		}
-		const FName NewFName( *GeneratedName );
+		FName NewFName( *GeneratedName );
+
+		// check if name is "None", NAME_None, that is a valid name to assign
+		// but in maya the name will be something like "_110" while here it will
+		// be "None" with no number. So althoug renaming "succeeded" the names 
+		// differ.
+		if( NewFName == NAME_None )
+		{
+			NewFName = FName( *M2U_GENERATED_NAME );
+		}
 
 
 		// 2. Rename the object
@@ -135,6 +147,10 @@ namespace m2uHelper
 		}
 
 		FName TestName( *GeneratedName );
+		if( TestName == NAME_None )
+		{
+			TestName = FName( *M2U_GENERATED_NAME );
+		}
 
 		// TODO: maybe check only inside the current level or so?
 		UObject* Outer = ANY_PACKAGE;
