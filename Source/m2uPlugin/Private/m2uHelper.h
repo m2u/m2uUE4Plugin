@@ -1,7 +1,7 @@
 #ifndef _M2UHELPER_H_
 #define _M2UHELPER_H_
 
-
+#include "AssetSelection.h"
 // Provides functions that are used by most likely more than one command or action
 
 
@@ -241,6 +241,72 @@ namespace m2uHelper
 
 	}// void SetActorTransformRelativeFromText()
 
+
+/**
+ * Spawn a new Actor in the Level. Automatically find the type of Actor to create 
+ * based on the type of Asset. 
+ * 
+ * @param AssetPath The full path to the asset "/Game/Meshes/MyStaticMesh"
+ * @param InLevel The Level to add the Actor to
+ * @param Name The Name to assign to the Actor (should be a valid FName) if NAME_None
+ *             the engine will create a name based on the class
+ * @param bSelectActor Select the Actor after it is created
+ * @param Location Where to place the Actor
+ *
+ * @return The newly created Actor
+ *
+ * Inspired by the DragDrop functionality of the Viewports, see
+ * LevelEditorViewport::AttemptDropObjAsActors and
+ * SLevelViewport::HandlePlaceDraggedObjects
+ */
+	AActor* AddNewActorFromAsset( FString& AssetPath, 
+								  ULevel* InLevel, 
+								  const FName Name = NAME_None,
+								  bool bSelectActor = true, 
+								  const FVector& Location = FVector(0,0,0),
+								  EObjectFlags ObjectFlags = RF_Transactional)
+	{
+
+		// If there is no dot, add a dot and repeat the object name.
+		// /Game/Meshes/MyStaticMesh.MyStaticMesh would be the actual path
+		// to the object, while the MyStaticMesh before the dot is the package
+		// copied from ConstructorHelpers
+		int32 PackageDelimPos = INDEX_NONE;
+		AssetPath.FindChar( TCHAR('.'), PackageDelimPos );
+		if( PackageDelimPos == INDEX_NONE )
+		{
+			int32 ObjectNameStart = INDEX_NONE;
+			AssetPath.FindLastChar( TCHAR('/'), ObjectNameStart );
+			if( ObjectNameStart != INDEX_NONE )
+			{
+				const FString ObjectName = AssetPath.Mid( ObjectNameStart+1 );
+				AssetPath += TCHAR('.');
+				AssetPath += ObjectName;
+			}
+		}
+
+
+		// try to find the asset
+		UE_LOG(LogM2U, Log, TEXT("Trying to find Asset %s."), *AssetPath);
+		//UObject* Asset = FindObject<UObject>( ANY_PACKAGE, *AssetPath, false );
+		UObject* Asset = StaticLoadObject(UObject::StaticClass(), NULL, *AssetPath);
+		if( Asset == NULL)
+		{
+			// TODO: load full package, if Blueprint (see HandlePlaceDraggedObjects)
+			UE_LOG(LogM2U, Log, TEXT("Failed to find Asset %s."), *AssetPath);
+			return NULL;
+		}
+		UClass* AssetClass = Asset->GetClass();
+		//UActorFactory* ActorFactory = GEditor->FindActorFactoryForActorClass( AssetClass );
+		
+		AActor* Actor = FActorFactoryAssetProxy::AddActorForAsset( Asset, &Location, false, bSelectActor, ObjectFlags, NULL, Name );
+		// the Actor will sometimes receive the Name, but not if it is a blueprint?
+		// it will never receive the name as Label, so we set the name explicitly 
+		// again here.
+		Actor->SetActorLabel(Name.ToString());
+		
+		return Actor;
+	}// AActor* AddNewActorFromAsset()
 
 } // namespace m2uHelper
 #endif /* _M2UHELPER_H_ */

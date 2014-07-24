@@ -55,6 +55,16 @@ void Fm2uPlugin::ShutdownModule()
 	TickObject = NULL;
 }
 
+bool Fm2uPlugin::Exec( UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar )
+{
+	if( FParse::Command(&Cmd, TEXT("m2uSayHello")) )
+	{
+		UE_LOG(LogM2U, Log, TEXT("Received a command via Exec"));
+		return true;
+	}
+	return false;
+}
+
 bool Fm2uPlugin::HandleConnectionAccepted( FSocket* ClientSocket, const FIPv4Endpoint& ClientEndpoint)
 {
 	if(Client==NULL)
@@ -140,6 +150,7 @@ bool GetActorByName( const TCHAR* Name, AActor** OutActor, UWorld* InWorld = NUL
 	//OutActor = FindObject<AActor>( InWorld->GetCurrentLevel(), Name );
 	Actor = FindObject<AActor>( ANY_PACKAGE, Name, false );
 	// TODO: check if StaticFindObject or StaticFindObjectFastInternal is better
+	// and if searching in current world gives a perfo boost, if thats possible
 	if( Actor == NULL ) // actor with that name cannot be found
 	{
 		return false;
@@ -541,6 +552,25 @@ FString ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 	}
 
 
+	else if( FParse::Command(&Str, TEXT("AddActor")))
+	{
+		FString AssetName = FParse::Token(Str,0);
+		const FString ActorName = FParse::Token(Str,0);
+		auto World = GEditor->GetEditorWorldContext().World();
+		ULevel* Level = World->GetCurrentLevel();
+
+		FName ActorFName = m2uHelper::GetFreeName(ActorName);
+		AActor* Actor = m2uHelper::AddNewActorFromAsset(AssetName, Level, ActorFName, false);
+		if( Actor == NULL )
+		{
+			//UE_LOG(LogM2U, Log, TEXT("failed creating from asset"));
+			return TEXT("1");
+		}
+
+		ActorFName = Actor->GetFName();
+		
+		return ActorFName.ToString();
+	}
 
 
 	else
