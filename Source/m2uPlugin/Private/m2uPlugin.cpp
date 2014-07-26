@@ -1,6 +1,8 @@
 // Copyright 1998-2014 Epic Games, Inc. All Rights Reserved.
 
 #include "m2uPluginPrivatePCH.h"
+#include "m2uPlugin.generated.inl"
+
 #include "Networking.h"
 #include "ActorEditorUtils.h"
 #include "UnrealEd.h"
@@ -15,7 +17,7 @@ IMPLEMENT_MODULE( Fm2uPlugin, m2uPlugin )
 
 
 bool GetActorByName( const TCHAR* Name, AActor* OutActor, UWorld* InWorld);
-FString ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn);
+FString ExecuteCommand(const TCHAR* Str/*, Fm2uPlugin* Conn*/);
 
 Fm2uPlugin::Fm2uPlugin()
 	:TcpListener(NULL),
@@ -62,6 +64,11 @@ bool Fm2uPlugin::Exec( UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar )
 		UE_LOG(LogM2U, Log, TEXT("Received a command via Exec"));
 		return true;
 	}
+	else if( FParse::Command(&Cmd, TEXT("m2uTestMultilineLog")) )
+	{
+		UE_LOG(LogM2U, Log, TEXT("logging a line break \n here it is, now wait for UE to crash?"));
+		return true;
+	}
 	return false;
 }
 
@@ -80,10 +87,25 @@ bool Fm2uPlugin::HandleConnectionAccepted( FSocket* ClientSocket, const FIPv4End
 
 void Fm2uPlugin::Tick( float DeltaTime )
 {
-    // get data from client
-	if(Client==NULL)
-		return;
+	// valid and connected?
+	if( Client != NULL && Client -> GetConnectionState() == SCS_Connected)
+	{
+		// get the message, do stuff, and tell the caller what happened ;)
+		FString Message;	
+		if( GetMessage(Message) )
+		{
+			FString Result = ExecuteCommand(*Message);
+			SendResponse(Result);
+		}
+	}
+}
 
+
+bool Fm2uPlugin::GetMessage(FString& Result)
+{
+	// get all data from client and create one long FString from it
+	// return the result when the client is out of pending data.
+	//FString Result;
 	uint32 DataSize = 0;
 	while(Client->HasPendingData(DataSize) && DataSize > 0 )
 	{
@@ -110,12 +132,16 @@ void Fm2uPlugin::Tick( float DeltaTime )
 			//UE_LOG(LogM2U, Log, TEXT("server received %s"), *Text);
 			//UE_LOG(LogM2U, Log, TEXT("Server received: %s"), Dest);
 
-			FString Result = ExecuteCommand(Dest, this);
-			SendResponse(Result);
+			//FString Result = ExecuteCommand(Dest, this);
+			//SendResponse(Result);
+
+			// add all the message parts to the Result
+			Result += Dest;
 
 			delete Dest;
 		}
-	}
+	}// while
+	return true;
 }
 
 void Fm2uPlugin::SendResponse(const FString& Message)
@@ -168,7 +194,7 @@ bool GetActorByName( const TCHAR* Name, AActor** OutActor, UWorld* InWorld = NUL
 	}
 }
 
-FString ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
+FString ExecuteCommand(const TCHAR* Str/*, Fm2uPlugin* Conn*/)
 {
 	if( FParse::Command(&Str, TEXT("Exec")))
 	{
@@ -572,6 +598,25 @@ FString ExecuteCommand(const TCHAR* Str, Fm2uPlugin* Conn)
 		return ActorFName.ToString();
 	}
 
+	else if( FParse::Command(&Str, TEXT("ImportAssets")))
+	{
+		FString RootDestinationPath = FParse::Token(Str,0);
+		TArray<FString> Files;
+		//while( Str != NULL )
+		//{
+			FString AssetName = FParse::Token(Str,0);
+			Files.Add(AssetName);
+			//}
+		m2uHelper::ImportAssets(Files, RootDestinationPath, true);
+		return TEXT("Ok");
+	}
+
+	else if( FParse::Command(&Str, TEXT("LongTest")))
+	{
+		// wow, logging line-breaks makes UE crash?
+		UE_LOG(LogM2U, Log, TEXT("Received long message: %s"), Str);
+		return TEXT("Ok");
+	}
 
 	else
 	{

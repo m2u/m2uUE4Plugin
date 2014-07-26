@@ -13,8 +13,15 @@ public:
 	/* IModuleInterface implementation */
 	virtual void StartupModule() OVERRIDE;
 	virtual void ShutdownModule() OVERRIDE;
+
+	/* TcpListener Delegate */
 	bool HandleConnectionAccepted( FSocket* ClientSocket, const FIPv4Endpoint& ClientEndpoint);
+
+	/* TickObject Delegate */
 	void Tick( float DeltaTime );
+
+	/* TCP messaging functions */
+	bool GetMessage(FString& Result);
 	void SendResponse( const FString& Message);
 
 	/* FExec implementation */

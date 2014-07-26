@@ -2,6 +2,7 @@
 #define _M2UHELPER_H_
 
 #include "AssetSelection.h"
+#include "AssetToolsModule.h"
 // Provides functions that are used by most likely more than one command or action
 
 
@@ -291,22 +292,79 @@ namespace m2uHelper
 		//UObject* Asset = FindObject<UObject>( ANY_PACKAGE, *AssetPath, false );
 		UObject* Asset = StaticLoadObject(UObject::StaticClass(), NULL, *AssetPath);
 		if( Asset == NULL)
-		{
-			// TODO: load full package, if Blueprint (see HandlePlaceDraggedObjects)
+		{			
 			UE_LOG(LogM2U, Log, TEXT("Failed to find Asset %s."), *AssetPath);
 			return NULL;
 		}
 		UClass* AssetClass = Asset->GetClass();
-		//UActorFactory* ActorFactory = GEditor->FindActorFactoryForActorClass( AssetClass );
 		
 		AActor* Actor = FActorFactoryAssetProxy::AddActorForAsset( Asset, &Location, false, bSelectActor, ObjectFlags, NULL, Name );
-		// the Actor will sometimes receive the Name, but not if it is a blueprint?
-		// it will never receive the name as Label, so we set the name explicitly 
+		// The Actor will sometimes receive the Name, but not if it is a blueprint?
+		// It will never receive the name as Label, so we set the name explicitly 
 		// again here.
 		Actor->SetActorLabel(Name.ToString());
 		
 		return Actor;
 	}// AActor* AddNewActorFromAsset()
+
+
+/**
+ * Import the files as assets into UE
+ *
+ * @param Files Array of file-paths (or directories) to import
+ * @param RootDestinationPath The root for the package file structure of where 
+ *        to import the Assets to.
+ * @param bUseEditorImportFunc Use the default In-Editor way of importing assets,
+ *        this may create popup-dialogs for overwrite warnings. This is not what
+ *        we want when controlling the Editor from Maya or so.
+ *
+ * Why this function and not just use the Editor function? The code, what the 
+ * functions do is generally the same. But this function allows us to not have
+ * editor popups asking the user if he wants to overwrite or replace assets. 
+ * This is espcially true for FBX files, which create their own popup dialog
+ * although the FBX importer automatically can decide for StaticMesh or SkelMesh
+ */
+	TArray<UObject*> ImportAssets(const TArray<FString>& Files, const FString& RootDestinationPath, bool bUseEditorImportFunc = true/*, ImportAssetUserInputFunc InputGetter = NULL*/ )
+	{
+		// get the FAssetTools instance from the AssetToolsModule
+		IAssetTools& AssetTools = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools").Get();
+		// Use the FAssetTools::ImportAssets function to import the assets
+		if( bUseEditorImportFunc )
+		{
+			return AssetTools.ImportAssets(Files, RootDestinationPath);
+		}
+		
+		UE_LOG(LogM2U, Error, TEXT("Own ImportAsset functionality not implemented yet"));
+		TArray<UObject*> ReturnObjects;
+		return ReturnObjects;
+		// NOTE: FAssetTools::ExpandDirectories will add subfolders from the 
+		// import paths as subfolders for the desination paths, importing a whole
+		// file structure will retain the same paths this way (as long as the names
+		// are valid I suppose).
+
+		// TODO: add our own implementation here.
+		// the code will be exactly what the AssetTools function does, but whenever
+		// there is a problem asking for user input, we will call the InputGetter 
+		// function to get the user input via the TCP input from the Program side
+		// this is important to not get the focus off from the users current
+		// application, and maybe we need to re-export or rename an exportet file
+		// so the file-structure on-disk and the file-structure in-engine match
+		// a matching file-structure is a very important part of a waterproof asset 
+		// pipeline and especially the main means of how m2u can create associations
+		// between objects in the Program and objects in the Editor.
+		// If InputGetter is NULL, we assume that user-input is not wanted, instead
+		// we decide to always overwrite and replace objects if the case comes up.
+		// since we can't assure that the names on-disk and in-engine will match up
+		// then, this is not the preferred way to use for a synced pipeline
+		// but probably the best way for "just-build-the-shit" functionality
+		// It is up to the specific implementation of the InputGetter function
+		// if really user-input is requested. If the function always tells us
+		// to just go on, you can automate the whole process of overwriting while
+		// still getting the chance to rename a file on disk or create a 
+		// "disk-name"->"engine-name" association so you can be sure to be able
+		// to find your assets by name after they were imported.
+		
+	}
 
 } // namespace m2uHelper
 #endif /* _M2UHELPER_H_ */
