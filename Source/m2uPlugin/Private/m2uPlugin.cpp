@@ -194,6 +194,30 @@ bool GetActorByName( const TCHAR* Name, AActor** OutActor, UWorld* InWorld = NUL
 	}
 }
 
+
+// TODO: this is only temporaryly here until we go full Oject-Oriented and so
+FString GetUserInput(const FString& Problem)
+{
+	// TODO: get this plugin here from the manager to send messages
+	// using the m2uPlugin instance
+	UE_LOG(LogM2U, Log, TEXT("GetUserInput was called"));
+	if( Problem.StartsWith(TEXT("UsedByMap")) )
+	{
+		return TEXT("Skip"); 
+	}
+	else if( Problem.StartsWith(TEXT("Overwrite")) )
+	{
+		return TEXT("YesAll");
+	}
+	else if( Problem.StartsWith(TEXT("Replace")) )
+	{
+		return TEXT("SkipAll");
+	}
+	UE_LOG(LogM2U, Log, TEXT("Unknown Problem: %s"), *Problem);
+	return TEXT("");
+	
+}
+
 FString ExecuteCommand(const TCHAR* Str/*, Fm2uPlugin* Conn*/)
 {
 	if( FParse::Command(&Str, TEXT("Exec")))
@@ -607,7 +631,7 @@ FString ExecuteCommand(const TCHAR* Str/*, Fm2uPlugin* Conn*/)
 			FString AssetName = FParse::Token(Str,0);
 			Files.Add(AssetName);
 			//}
-		m2uHelper::ImportAssets(Files, RootDestinationPath, true);
+			m2uHelper::ImportAssets(Files, RootDestinationPath, false, &GetUserInput);
 		return TEXT("Ok");
 	}
 
