@@ -45,13 +45,13 @@ void Fm2uPlugin::StartupModule()
 void Fm2uPlugin::ShutdownModule()
 {
 
-	TcpListener->Stop();
-	delete TcpListener;
-	TcpListener = NULL;
-
     // close all clients
 	Client->Close();
 	Client=NULL;
+
+	TcpListener->Stop();
+	delete TcpListener;
+	TcpListener = NULL;
 
 	delete TickObject;
 	TickObject = NULL;
@@ -141,7 +141,10 @@ bool Fm2uPlugin::GetMessage(FString& Result)
 			delete Dest;
 		}
 	}// while
-	return true;
+	if(! Result.IsEmpty() )
+		return true;
+	else
+		return false;
 }
 
 void Fm2uPlugin::SendResponse(const FString& Message)
@@ -626,24 +629,33 @@ FString ExecuteCommand(const TCHAR* Str/*, Fm2uPlugin* Conn*/)
 	{
 		FString RootDestinationPath = FParse::Token(Str,0);
 		TArray<FString> Files;
-		//while( Str != NULL )
-		//{
-			FString AssetName = FParse::Token(Str,0);
+		FString AssetName;
+		while( FParse::Token(Str, AssetName, 0) )
+		{
 			Files.Add(AssetName);
-			//}
-			m2uHelper::ImportAssets(Files, RootDestinationPath, false, &GetUserInput);
+		}
+		m2uHelper::ImportAssets(Files, RootDestinationPath, false/*, &GetUserInput*/ );
+		return TEXT("Ok");
+	}
+
+	else if( FParse::Command(&Str, TEXT("ExportAsset")))
+	{
+		UE_LOG(LogM2U, Log, TEXT("Received ExportAsset: %s"), Str);
+		FString AssetName = FParse::Token(Str,0);
+		FString ExportPath = FParse::Token(Str,0);
+		m2uHelper::ExportAsset(AssetName, ExportPath);
 		return TEXT("Ok");
 	}
 
 	else if( FParse::Command(&Str, TEXT("LongTest")))
 	{
-		// wow, logging line-breaks makes UE crash?
 		UE_LOG(LogM2U, Log, TEXT("Received long message: %s"), Str);
 		return TEXT("Ok");
 	}
 
 	else
 	{
+		UE_LOG(LogM2U, Warning, TEXT("Command not found: %s"), Str);
 		return TEXT("Command Not Found");
 	}
 

@@ -268,34 +268,10 @@ namespace m2uHelper
 								  EObjectFlags ObjectFlags = RF_Transactional)
 	{
 
-		// If there is no dot, add a dot and repeat the object name.
-		// /Game/Meshes/MyStaticMesh.MyStaticMesh would be the actual path
-		// to the object, while the MyStaticMesh before the dot is the package
-		// copied from ConstructorHelpers
-		int32 PackageDelimPos = INDEX_NONE;
-		AssetPath.FindChar( TCHAR('.'), PackageDelimPos );
-		if( PackageDelimPos == INDEX_NONE )
-		{
-			int32 ObjectNameStart = INDEX_NONE;
-			AssetPath.FindLastChar( TCHAR('/'), ObjectNameStart );
-			if( ObjectNameStart != INDEX_NONE )
-			{
-				const FString ObjectName = AssetPath.Mid( ObjectNameStart+1 );
-				AssetPath += TCHAR('.');
-				AssetPath += ObjectName;
-			}
-		}
-
-
-		// try to find the asset
-		UE_LOG(LogM2U, Log, TEXT("Trying to find Asset %s."), *AssetPath);
-		//UObject* Asset = FindObject<UObject>( ANY_PACKAGE, *AssetPath, false );
-		UObject* Asset = StaticLoadObject(UObject::StaticClass(), NULL, *AssetPath);
+		UObject* Asset = GetAssetFromPath(AssetPath);
 		if( Asset == NULL)
-		{			
-			UE_LOG(LogM2U, Log, TEXT("Failed to find Asset %s."), *AssetPath);
 			return NULL;
-		}
+
 		UClass* AssetClass = Asset->GetClass();
 		
 		AActor* Actor = FActorFactoryAssetProxy::AddActorForAsset( Asset, &Location, false, bSelectActor, ObjectFlags, NULL, Name );
