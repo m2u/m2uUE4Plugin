@@ -114,7 +114,7 @@ namespace m2uHelper
  * editor popups asking the user if he wants to overwrite or replace assets.
  * This is espcially true for FBX files, which create their own popup dialog
  * although the FBX importer automatically can decide for StaticMesh or SkelMesh.
- * Therefore, whenever we import a FBX file, we will use our m2uFbxFactory explicitly
+ * Therefore, whenever we import an FBX file, we will use our m2uFbxFactory explicitly
  */
 	TArray<UObject*> ImportAssets(const TArray<FString>& Files, const FString& RootDestinationPath, bool bUseEditorImportFunc = true, RequestUserInputFunc InputGetter = NULL )
 	{

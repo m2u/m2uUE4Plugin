@@ -11,6 +11,45 @@ namespace m2uHelper
 
 	const FString M2U_GENERATED_NAME(TEXT("m2uGeneratedName"));
 
+
+/**
+   tries to find an Actor by name and makes sure it is valid.
+   @param Name The name to look for
+   @param OutActor This will be the found Actor or NULL
+   @param InWorld The world in which to search for the Actor
+
+   @return true if found and valid, false otherwise
+   TODO: narrow searching to the InWorld or current world if not set.
+ */
+bool GetActorByName( const TCHAR* Name, AActor** OutActor, UWorld* InWorld = NULL)
+{
+	if( InWorld == NULL)
+	{
+		InWorld = GEditor->GetEditorWorldContext().World();
+	}
+	AActor* Actor;
+	//OutActor = FindObject<AActor>( InWorld->GetCurrentLevel(), Name );
+	Actor = FindObject<AActor>( ANY_PACKAGE, Name, false );
+	// TODO: check if StaticFindObject or StaticFindObjectFastInternal is better
+	// and if searching in current world gives a perfo boost, if thats possible
+	if( Actor == NULL ) // actor with that name cannot be found
+	{
+		return false;
+	}
+	else if( ! Actor->IsValidLowLevelFast() )
+	{
+		//UE_LOG(LogM2U, Log, TEXT("Actor is NOT valid"));
+		return false;
+	}
+	else
+	{
+		//UE_LOG(LogM2U, Log, TEXT("Actor is valid"));
+		*OutActor=Actor;
+		return true;
+	}
+}
+
+
 /**
  * FName RenameActor( AActor* Actor, const FString& Name)
  *

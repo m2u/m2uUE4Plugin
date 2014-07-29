@@ -8,6 +8,8 @@
 #include "UnrealEd.h"
 
 #include "m2uHelper.h"
+#include "m2uActions.h"
+#include "m2uBatchFileParse.h"
 
 DEFINE_LOG_CATEGORY( LogM2U )
 
@@ -16,7 +18,7 @@ DEFINE_LOG_CATEGORY( LogM2U )
 IMPLEMENT_MODULE( Fm2uPlugin, m2uPlugin )
 
 
-bool GetActorByName( const TCHAR* Name, AActor* OutActor, UWorld* InWorld);
+//bool GetActorByName( const TCHAR* Name, AActor* OutActor, UWorld* InWorld);
 FString ExecuteCommand(const TCHAR* Str/*, Fm2uPlugin* Conn*/);
 
 Fm2uPlugin::Fm2uPlugin()
@@ -64,9 +66,19 @@ bool Fm2uPlugin::Exec( UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar )
 		UE_LOG(LogM2U, Log, TEXT("Received a command via Exec"));
 		return true;
 	}
-	else if( FParse::Command(&Cmd, TEXT("m2uTestMultilineLog")) )
+	else if( FParse::Command(&Cmd, TEXT("m2uCloseConnection")) )
 	{
-		UE_LOG(LogM2U, Log, TEXT("logging a line break \n here it is, now wait for UE to crash?"));
+		Client->Close();
+		Client=NULL;
+		return true;
+	}
+	else if( FParse::Command(&Cmd, TEXT("m2uBatchFileParse")) )
+	{
+		FString Filename;
+		if( FParse::Token(Cmd, Filename, 0))
+		{
+			m2uBatchFileParse(Filename);
+		}
 		return true;
 	}
 	return false;
@@ -163,46 +175,17 @@ void Fm2uPlugin::SendResponse(const FString& Message)
 	int32 BytesSent = 0;
 	if(	! Client->Send( Dest, DestLen, BytesSent) )
 	{
-		UE_LOG(LogM2U, Log, TEXT("server sending answer failed"));
+		UE_LOG(LogM2U, Error, TEXT("TCP Server sending answer failed."));
 	}
 }
 
 //void HandleReceivedData(FArrayReader& Data)
 
-bool GetActorByName( const TCHAR* Name, AActor** OutActor, UWorld* InWorld = NULL)
-{
-	if( InWorld == NULL)
-	{
-		InWorld = GEditor->GetEditorWorldContext().World();
-	}
-	AActor* Actor;
-	//OutActor = FindObject<AActor>( InWorld->GetCurrentLevel(), Name );
-	Actor = FindObject<AActor>( ANY_PACKAGE, Name, false );
-	// TODO: check if StaticFindObject or StaticFindObjectFastInternal is better
-	// and if searching in current world gives a perfo boost, if thats possible
-	if( Actor == NULL ) // actor with that name cannot be found
-	{
-		return false;
-	}
-	else if( ! Actor->IsValidLowLevelFast() )
-	{
-		//UE_LOG(LogM2U, Log, TEXT("Actor is NOT valid"));
-		return false;
-	}
-	else
-	{
-		//UE_LOG(LogM2U, Log, TEXT("Actor is valid"));
-		*OutActor=Actor;
-		return true;
-	}
-}
-
-
 // TODO: this is only temporaryly here until we go full Oject-Oriented and so
 FString GetUserInput(const FString& Problem)
 {
-	// TODO: get this plugin here from the manager to send messages
-	// using the m2uPlugin instance
+	// TODO: get the m2uPlugin instance here from the plugin-manager to send messages
+	// over TCP for user input.
 	UE_LOG(LogM2U, Log, TEXT("GetUserInput was called"));
 	if( Problem.StartsWith(TEXT("UsedByMap")) )
 	{
@@ -280,20 +263,7 @@ FString ExecuteCommand(const TCHAR* Str/*, Fm2uPlugin* Conn*/)
 	// -- EDITING --
 	else if( FParse::Command(&Str, TEXT("TransformObject")))
 	{
-		const FString ActorName = FParse::Token(Str,0);
-		AActor* Actor = NULL;
-		UE_LOG(LogM2U, Log, TEXT("Searching for Actor with name %s"), *ActorName);
-
-		if(!GetActorByName(*ActorName, &Actor) || Actor == NULL)
-		{
-			UE_LOG(LogM2U, Log, TEXT("Actor %s not found or invalid."), *ActorName);
-			return TEXT("1");
-		}
-
-		m2uHelper::SetActorTransformRelativeFromText(Actor, Str);
-
-		GEditor->RedrawLevelEditingViewports();
-		return TEXT("Ok");
+		return m2uActions::TransformObject(Str);
 	}
 	else if( FParse::Command(&Str, TEXT("DeleteSelected")))
 	{
@@ -332,7 +302,7 @@ FString ExecuteCommand(const TCHAR* Str/*, Fm2uPlugin* Conn*/)
 
 		// find the Actor
 		AActor* Actor = NULL;
-		if(!GetActorByName(*ActorName, &Actor) || Actor == NULL)
+		if(!m2uHelper::GetActorByName(*ActorName, &Actor) || Actor == NULL)
 		{
 			UE_LOG(LogM2U, Log, TEXT("Actor %s not found or invalid."), *ActorName);
 			return TEXT("1"); // NOT FOUND
@@ -350,7 +320,7 @@ FString ExecuteCommand(const TCHAR* Str/*, Fm2uPlugin* Conn*/)
 		UE_LOG(LogM2U, Log, TEXT("Searching for Actor with name %s"), *ActorName);
 
 		// Find the Original to clone
-		if(!GetActorByName(*ActorName, &OrigActor) || OrigActor == NULL)
+		if(!m2uHelper::GetActorByName(*ActorName, &OrigActor) || OrigActor == NULL)
 		{
 			UE_LOG(LogM2U, Log, TEXT("Actor %s not found or invalid."), *ActorName);
 			return TEXT("1"); // original not found
@@ -414,60 +384,7 @@ FString ExecuteCommand(const TCHAR* Str/*, Fm2uPlugin* Conn*/)
 
 	else if( FParse::Command(&Str, TEXT("ParentChildTo")))
 	{
-		const FString ChildName = FParse::Token(Str,0);
-		Str = FCString::Strchr(Str,' ');
-		FString ParentName;
-		if( Str != NULL) // there may be a parent name present
-		{
-			Str++;
-			if( *Str != '\0' ) // there was a space, but no name after that
-			{
-				ParentName = FParse::Token(Str,0);				
-			}
-		}
-		
-		AActor* ChildActor = NULL;		
-		if(!GetActorByName(*ChildName, &ChildActor) || ChildActor == NULL)
-		{
-			UE_LOG(LogM2U, Log, TEXT("Actor %s not found or invalid."), *ChildName);
-			return TEXT("1");
-		}
-		
-		// TODO: enable transaction?
-		//const FScopedTransaction Transaction( NSLOCTEXT("Editor", "UndoAction_PerformAttachment", "Attach actors") );
-
-		// parent to world, aka "detach"
-		if( ParentName.Len() < 1) // no valid parent name
-		{
-			USceneComponent* ChildRoot = ChildActor->GetRootComponent();
-			if(ChildRoot->AttachParent != NULL)
-			{
-				UE_LOG(LogM2U, Log, TEXT("Parenting %s the World."), *ChildName);
-				AActor* OldParentActor = ChildRoot->AttachParent->GetOwner();
-				OldParentActor->Modify();
-				ChildRoot->DetachFromParent(true);
-				//ChildActor->SetFolderPath(OldParentActor->GetFolderPath());
-
-				GEngine->BroadcastLevelActorDetached(ChildActor, OldParentActor);
-			}
-			return TEXT("0");
-		}
-		
-		AActor* ParentActor = NULL;
-		if(!GetActorByName(*ParentName, &ParentActor) || ParentActor == NULL)
-		{
-			UE_LOG(LogM2U, Log, TEXT("Actor %s not found or invalid."), *ParentName);
-			return TEXT("1");
-		}							
-		if( ParentActor == ChildActor ) // can't parent actor to itself
-		{
-			return TEXT("1");
-		}
-		// parent to other actor, aka "attach"
-		UE_LOG(LogM2U, Log, TEXT("Parenting %s to %s."), *ChildName, *ParentName);
-		GEditor->ParentActors( ParentActor, ChildActor, NAME_None);
-		
-		return TEXT("0");
+		return m2uActions::ParentChildTo(Str);
 	}
 
 
@@ -607,35 +524,20 @@ FString ExecuteCommand(const TCHAR* Str/*, Fm2uPlugin* Conn*/)
 
 	else if( FParse::Command(&Str, TEXT("AddActor")))
 	{
-		FString AssetName = FParse::Token(Str,0);
-		const FString ActorName = FParse::Token(Str,0);
-		auto World = GEditor->GetEditorWorldContext().World();
-		ULevel* Level = World->GetCurrentLevel();
-
-		FName ActorFName = m2uHelper::GetFreeName(ActorName);
-		AActor* Actor = m2uHelper::AddNewActorFromAsset(AssetName, Level, ActorFName, false);
-		if( Actor == NULL )
-		{
-			//UE_LOG(LogM2U, Log, TEXT("failed creating from asset"));
-			return TEXT("1");
-		}
-
-		ActorFName = Actor->GetFName();
-		
-		return ActorFName.ToString();
+		return m2uActions::AddActor(Str);
+	}
+	else if( FParse::Command(&Str, TEXT("AddActorBatch")))
+	{
+		return m2uActions::AddActorBatch(Str);
 	}
 
 	else if( FParse::Command(&Str, TEXT("ImportAssets")))
 	{
-		FString RootDestinationPath = FParse::Token(Str,0);
-		TArray<FString> Files;
-		FString AssetName;
-		while( FParse::Token(Str, AssetName, 0) )
-		{
-			Files.Add(AssetName);
-		}
-		m2uHelper::ImportAssets(Files, RootDestinationPath, false/*, &GetUserInput*/ );
-		return TEXT("Ok");
+		return m2uActions::ImportAssets(Str);
+	}
+	else if( FParse::Command(&Str, TEXT("ImportAssetsBatch")))
+	{
+		return m2uActions::ImportAssetsBatch(Str);
 	}
 
 	else if( FParse::Command(&Str, TEXT("ExportAsset")))
