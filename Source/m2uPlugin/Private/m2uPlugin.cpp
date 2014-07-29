@@ -48,8 +48,11 @@ void Fm2uPlugin::ShutdownModule()
 {
 
     // close all clients
-	Client->Close();
-	Client=NULL;
+	if(Client != NULL)
+	{
+		Client->Close();
+		Client=NULL;
+	}
 
 	TcpListener->Stop();
 	delete TcpListener;
@@ -61,15 +64,13 @@ void Fm2uPlugin::ShutdownModule()
 
 bool Fm2uPlugin::Exec( UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar )
 {
-	if( FParse::Command(&Cmd, TEXT("m2uSayHello")) )
+	if( FParse::Command(&Cmd, TEXT("m2uCloseConnection")) )
 	{
-		UE_LOG(LogM2U, Log, TEXT("Received a command via Exec"));
-		return true;
-	}
-	else if( FParse::Command(&Cmd, TEXT("m2uCloseConnection")) )
-	{
-		Client->Close();
-		Client=NULL;
+		if(Client != NULL)
+		{
+			Client->Close();
+			Client=NULL;
+		}
 		return true;
 	}
 	else if( FParse::Command(&Cmd, TEXT("m2uBatchFileParse")) )
@@ -79,6 +80,12 @@ bool Fm2uPlugin::Exec( UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar )
 		{
 			m2uBatchFileParse(Filename);
 		}
+		return true;
+	}
+	else if( FParse::Command(&Cmd, TEXT("m2uDo")) )
+	{
+		// execute an Action without using tcp connection
+		ExecuteCommand(Cmd);
 		return true;
 	}
 	return false;
@@ -161,21 +168,21 @@ bool Fm2uPlugin::GetMessage(FString& Result)
 
 void Fm2uPlugin::SendResponse(const FString& Message)
 {
-	if( Client == NULL)
-		return;
-
-	//const uint8* Data = *Message;
-	//const int32 Count = Message.Len();
-	int32 DestLen = TStringConvert<TCHAR,ANSICHAR>::ConvertedLength(*Message, Message.Len());
-	//UE_LOG(LogM2U, Log, TEXT("DestLen will be %i"), DestLen);
-	uint8* Dest = new uint8[DestLen+1];
-	TStringConvert<TCHAR,ANSICHAR>::Convert((ANSICHAR*)Dest, DestLen, *Message, Message.Len());
-	Dest[DestLen]='\0';
-
-	int32 BytesSent = 0;
-	if(	! Client->Send( Dest, DestLen, BytesSent) )
+	if( Client != NULL && Client -> GetConnectionState() == SCS_Connected)
 	{
-		UE_LOG(LogM2U, Error, TEXT("TCP Server sending answer failed."));
+		//const uint8* Data = *Message;
+		//const int32 Count = Message.Len();
+		int32 DestLen = TStringConvert<TCHAR,ANSICHAR>::ConvertedLength(*Message, Message.Len());
+		//UE_LOG(LogM2U, Log, TEXT("DestLen will be %i"), DestLen);
+		uint8* Dest = new uint8[DestLen+1];
+		TStringConvert<TCHAR,ANSICHAR>::Convert((ANSICHAR*)Dest, DestLen, *Message, Message.Len());
+		Dest[DestLen]='\0';
+
+		int32 BytesSent = 0;
+		if(	! Client->Send( Dest, DestLen, BytesSent) )
+		{
+			UE_LOG(LogM2U, Error, TEXT("TCP Server sending answer failed."));
+		}
 	}
 }
 
