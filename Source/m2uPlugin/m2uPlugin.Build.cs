@@ -11,7 +11,7 @@ namespace UnrealBuildTool.Rules
 				new string[] {
 					"Developer/AssetTools/Public",
 					"Editor/UnrealEd/Public",
-					"Editor/UnrealEd/Classes",
+					"Editor/UnrealEd/Classes",					  
 					// ... add public include paths required here ...
 				}
 				);
@@ -21,9 +21,15 @@ namespace UnrealBuildTool.Rules
 					"Developer/m2uPlugin/Private",					
 					"Editor/UnrealEd/Public",
 					"Editor/UnrealEd/Classes",
+						"Editor/UnrealEd/Private",
+						"Editor/UnrealEd/Private/Fbx",
 					// ... add other private include paths required here ...
 				}
 				);
+
+			AddThirdPartyPrivateStaticDependencies(Target, 			
+			"FBX"
+		);
 
 			PublicDependencyModuleNames.AddRange(
 				new string[]

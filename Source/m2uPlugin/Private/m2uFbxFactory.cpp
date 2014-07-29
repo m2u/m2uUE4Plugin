@@ -1,6 +1,6 @@
 
 #include "m2uPluginPrivatePCH.h"
-
+#include "Editor/UnrealEd/Private/FbxImporter.h"
 
 Um2uFbxFactory::Um2uFbxFactory(const class FPostConstructInitializeProperties& PCIP)
 	: Super(PCIP)
@@ -21,6 +21,30 @@ bool Um2uFbxFactory::ConfigureProperties()
 	bDetectImportTypeOnImport = true;
 	// do not show the UI
 	bShowOption = false;
-
+	
+	// since we don't show the UI, not even the default-settings will be set,
+	// so we do this here.
+	UnFbx::FFbxImporter* FbxImporter = UnFbx::FFbxImporter::GetInstance();
+	UnFbx::FBXImportOptions* ImportOptions = FbxImporter -> GetImportOptions();
+	if( ImportOptions )
+	{
+		// General options
+		ImportOptions -> bImportMaterials = false;
+		ImportOptions -> bInvertNormalMap = false;
+		ImportOptions -> bImportTextures = false;
+		ImportOptions -> bImportLOD = false;
+		ImportOptions -> bUsedAsFullName = true;
+		ImportOptions -> bRemoveNameSpace = true;
+		ImportOptions -> NormalImportMethod = FBXNIM_ImportNormals;
+		// Static Mesh options
+		ImportOptions -> bCombineToSingle = true;
+		ImportOptions -> bReplaceVertexColors = false;
+		ImportOptions -> bRemoveDegenerates = true;
+		ImportOptions -> bOneConvexHullPerUCX = true;
+		//ImportOptions -> StaticMeshLODGroup = FName(TEXT("LevelArchitecture"));
+		// Skeletal Mesh options 
+		// TODO:... maybe
+	}
+	
 	return true;
 }
