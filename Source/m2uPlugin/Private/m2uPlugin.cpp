@@ -467,6 +467,20 @@ FString ExecuteCommand(const TCHAR* Str/*, Fm2uPlugin* Conn*/)
 		GEditor->RedrawLevelEditingViewports();
 		return TEXT("Ok");
 	}
+	else if( FParse::Command(&Str, TEXT("HideByNames")))
+	{
+		FString Name;
+		while( FParse::Token(Str, Name, 0) )
+		{
+			AActor* Actor = NULL;
+			if(m2uHelper::GetActorByName(*Name, &Actor) && !Actor->IsHiddenEd())
+			{
+				Actor->SetIsTemporarilyHiddenInEditor( true );
+			}
+		}
+		GEditor->RedrawLevelEditingViewports();
+		return TEXT("Ok");
+	}
 
 
 	// -- CAMERA --
