@@ -28,15 +28,15 @@ bool GetActorByName( const TCHAR* Name, AActor** OutActor, UWorld* InWorld = NUL
 		InWorld = GEditor->GetEditorWorldContext().World();
 	}
 	AActor* Actor;
-	//OutActor = FindObject<AActor>( InWorld->GetCurrentLevel(), Name );
-	Actor = FindObject<AActor>( ANY_PACKAGE, Name, false );
+	Actor = FindObject<AActor>( InWorld->GetCurrentLevel(), Name, false );
+	//Actor = FindObject<AActor>( ANY_PACKAGE, Name, false );
 	// TODO: check if StaticFindObject or StaticFindObjectFastInternal is better
 	// and if searching in current world gives a perfo boost, if thats possible
 	if( Actor == NULL ) // actor with that name cannot be found
 	{
 		return false;
 	}
-	else if( ! Actor->IsValidLowLevelFast() )
+	else if( ! Actor->IsValidLowLevel() )
 	{
 		//UE_LOG(LogM2U, Log, TEXT("Actor is NOT valid"));
 		return false;
@@ -193,7 +193,8 @@ bool GetActorByName( const TCHAR* Name, AActor** OutActor, UWorld* InWorld = NUL
 		}
 
 		// TODO: maybe check only inside the current level or so?
-		UObject* Outer = ANY_PACKAGE;
+		//UObject* Outer = ANY_PACKAGE;
+		UObject* Outer = GEditor->GetEditorWorldContext().World()->GetCurrentLevel();
 		UObject* ExistingObject;
 
 		// increase the suffix until there is no ExistingObject found
@@ -288,8 +289,7 @@ bool GetActorByName( const TCHAR* Name, AActor** OutActor, UWorld* InWorld = NUL
  * 
  * @param AssetPath The full path to the asset "/Game/Meshes/MyStaticMesh"
  * @param InLevel The Level to add the Actor to
- * @param Name The Name to assign to the Actor (should be a valid FName) if NAME_None
- *             the engine will create a name based on the class
+ * @param Name The Name to assign to the Actor (should be a valid FName) or NAME_None
  * @param bSelectActor Select the Actor after it is created
  * @param Location Where to place the Actor
  *
@@ -299,9 +299,9 @@ bool GetActorByName( const TCHAR* Name, AActor** OutActor, UWorld* InWorld = NUL
  * LevelEditorViewport::AttemptDropObjAsActors and
  * SLevelViewport::HandlePlaceDraggedObjects
  */
-	AActor* AddNewActorFromAsset( FString& AssetPath, 
+	AActor* AddNewActorFromAsset( FString AssetPath, 
 								  ULevel* InLevel, 
-								  const FName Name = NAME_None,
+								  FName Name = NAME_None,
 								  bool bSelectActor = true, 
 								  const FVector& Location = FVector(0,0,0),
 								  EObjectFlags ObjectFlags = RF_Transactional)
@@ -313,11 +313,15 @@ bool GetActorByName( const TCHAR* Name, AActor** OutActor, UWorld* InWorld = NUL
 
 		UClass* AssetClass = Asset->GetClass();
 		
+		if( Name == NAME_None)
+		{
+			Name = FName(TEXT("GeneratedName"));
+		}
 		AActor* Actor = FActorFactoryAssetProxy::AddActorForAsset( Asset, &Location, false, bSelectActor, ObjectFlags, NULL, Name );
 		// The Actor will sometimes receive the Name, but not if it is a blueprint?
 		// It will never receive the name as Label, so we set the name explicitly 
 		// again here.
-		Actor->SetActorLabel(Name.ToString());
+		Actor->SetActorLabel(Actor->GetFName().ToString());
 		
 		return Actor;
 	}// AActor* AddNewActorFromAsset()

@@ -20,7 +20,7 @@ namespace m2uActions
 	{
 		const FString ActorName = FParse::Token(Str,0);
 		AActor* Actor = NULL;
-		UE_LOG(LogM2U, Log, TEXT("Searching for Actor with name %s"), *ActorName);
+		//UE_LOG(LogM2U, Log, TEXT("Searching for Actor with name %s"), *ActorName);
 
 		if(!GetActorByName(*ActorName, &Actor) || Actor == NULL)
 		{

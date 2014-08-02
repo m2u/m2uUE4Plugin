@@ -503,7 +503,7 @@ namespace m2uHelper
 /**
    Find an asset.
  */
-	UObject* GetAssetFromPath(FString& AssetPath)
+	UObject* GetAssetFromPath(FString AssetPath)
 	{
 		// If there is no dot, add a dot and repeat the object name.
 		// /Game/Meshes/MyStaticMesh.MyStaticMesh would be the actual path

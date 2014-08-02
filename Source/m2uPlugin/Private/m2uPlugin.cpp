@@ -6,6 +6,8 @@
 #include "Networking.h"
 #include "ActorEditorUtils.h"
 #include "UnrealEd.h"
+#include "Editor/UnrealEd/Private/Layers/Layers.h"
+#include "Runtime/Engine/Classes/Engine/TextRenderActor.h"
 
 #include "m2uHelper.h"
 #include "m2uActions.h"
@@ -109,6 +111,7 @@ void Fm2uPlugin::Tick( float DeltaTime )
 	// valid and connected?
 	if( Client != NULL && Client -> GetConnectionState() == SCS_Connected)
 	{
+		//UE_LOG(LogM2U, Log, TEXT("Tick time was %f"),DeltaTime);
 		// get the message, do stuff, and tell the caller what happened ;)
 		FString Message;	
 		if( GetMessage(Message) )
@@ -213,6 +216,7 @@ FString GetUserInput(const FString& Problem)
 
 FString ExecuteCommand(const TCHAR* Str/*, Fm2uPlugin* Conn*/)
 {
+	//UE_LOG(LogM2U, Log, TEXT("Executing Command: %s"), Str);
 	if( FParse::Command(&Str, TEXT("Exec")))
 	{
 		if( GEditor->Exec(GEditor->GetEditorWorldContext().World(), Str) )
@@ -324,7 +328,7 @@ FString ExecuteCommand(const TCHAR* Str/*, Fm2uPlugin* Conn*/)
 		const FString ActorName = FParse::Token(Str,0);
 		AActor* OrigActor = NULL;
 		AActor* Actor = NULL; // the duplicate
-		UE_LOG(LogM2U, Log, TEXT("Searching for Actor with name %s"), *ActorName);
+		//UE_LOG(LogM2U, Log, TEXT("Searching for Actor with name %s"), *ActorName);
 
 		// Find the Original to clone
 		if(!m2uHelper::GetActorByName(*ActorName, &OrigActor) || OrigActor == NULL)
@@ -568,6 +572,77 @@ FString ExecuteCommand(const TCHAR* Str/*, Fm2uPlugin* Conn*/)
 		FString ExportPath = FParse::Token(Str,0);
 		m2uHelper::ExportAsset(AssetName, ExportPath);
 		return TEXT("Ok");
+	}
+
+	else if( FParse::Command(&Str, TEXT("AddObjectToLayer")))
+	{
+		FString ActorName = FParse::Token(Str,0);
+		FString LayerName = FParse::Token(Str,0);
+		FString RemoveFromOthers = FParse::Token(Str,0);
+		AActor* Actor;
+		if( m2uHelper::GetActorByName( *ActorName, &Actor) )
+		{
+			if( FCString::Stricmp( *RemoveFromOthers, TEXT("True") )==0 )
+			{
+				TArray<FName> AllLayerNames;
+				GEditor->Layers->AddAllLayerNamesTo(AllLayerNames);
+				GEditor->Layers->RemoveActorFromLayers(Actor, AllLayerNames);
+			}
+			GEditor->Layers->AddActorToLayer(Actor, FName(*LayerName));
+		}
+		return TEXT("Ok");
+	}
+	else if( FParse::Command(&Str, TEXT("RemoveObjectFromAllLayers")))
+	{
+		FString ActorName = FParse::Token(Str,0);
+		AActor* Actor;
+		if( m2uHelper::GetActorByName( *ActorName, &Actor) )
+		{
+			TArray<FName> AllLayerNames;
+			GEditor->Layers->AddAllLayerNamesTo(AllLayerNames);
+			GEditor->Layers->RemoveActorFromLayers(Actor, AllLayerNames);
+		}
+		return TEXT("Ok");
+	}
+	else if( FParse::Command(&Str, TEXT("HideLayer")))
+	{
+		FString LayerName = FParse::Token(Str,0);
+		GEditor->Layers->SetLayerVisibility(FName(*LayerName), false);
+		return TEXT("Ok");
+	}
+	else if( FParse::Command(&Str, TEXT("UnhideLayer")))
+	{
+		FString LayerName = FParse::Token(Str,0);
+		GEditor->Layers->SetLayerVisibility(FName(*LayerName), true);
+		return TEXT("Ok");
+	}
+	else if( FParse::Command(&Str, TEXT("DeleteLayer")))
+	{
+		FString LayerName = FParse::Token(Str,0);
+		GEditor->Layers->DeleteLayer(FName(*LayerName));
+		return TEXT("Ok");
+	}
+	else if( FParse::Command(&Str, TEXT("RenameLayer")))
+	{
+		FString OldName = FParse::Token(Str,0);
+		FString NewName = FParse::Token(Str,0);
+		GEditor->Layers->RenameLayer(FName(*OldName), FName(*NewName));
+		return TEXT("Ok");
+	}
+
+	else if( FParse::Command(&Str, TEXT("TestActor")))
+	{
+		auto World = GEditor->GetEditorWorldContext().World();
+		ULevel* Level = World->GetCurrentLevel();
+		AActor* Actor;
+		Actor = m2uHelper::AddNewActorFromAsset(
+			FString( TEXT("/Script/Engine.TextRenderActor")), Level,
+			FName(TEXT("Group")));
+		Actor->GetRootComponent()->Mobility = EComponentMobility::Static;
+		((ATextRenderActor*)Actor) -> TextRender -> SetText(FString(TEXT("Invisible Group Transform")));
+		Actor->SetActorHiddenInGame(true);
+		return TEXT("Ok");
+			
 	}
 
 	else if( FParse::Command(&Str, TEXT("LongTest")))
