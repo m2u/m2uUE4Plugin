@@ -574,33 +574,50 @@ FString ExecuteCommand(const TCHAR* Str/*, Fm2uPlugin* Conn*/)
 		return TEXT("Ok");
 	}
 
-	else if( FParse::Command(&Str, TEXT("AddObjectToLayer")))
+	else if( FParse::Command(&Str, TEXT("AddObjectsToLayer")))
 	{
-		FString ActorName = FParse::Token(Str,0);
 		FString LayerName = FParse::Token(Str,0);
-		FString RemoveFromOthers = FParse::Token(Str,0);
-		AActor* Actor;
-		if( m2uHelper::GetActorByName( *ActorName, &Actor) )
+		FString ActorNamesList = FParse::Token(Str,0);
+		bool bRemoveFromOthers = true;
+		FParse::Bool(Str, TEXT("RemoveFromOthers="), bRemoveFromOthers);
+
+		UE_LOG(LogM2U, Log, TEXT("AddObjectsToLayer received: %s %s"), *LayerName, *ActorNamesList);
+
+		TArray<FString> ActorNames = m2uHelper::ParseList(ActorNamesList);
+		for( FString ActorName : ActorNames )
 		{
-			if( FCString::Stricmp( *RemoveFromOthers, TEXT("True") )==0 )
+			UE_LOG(LogM2U, Log, TEXT("Actor Names List: %s"), *ActorName);
+			AActor* Actor;
+			if( m2uHelper::GetActorByName( *ActorName, &Actor) )
 			{
+				//if( FCString::Stricmp( *RemoveFromOthers, TEXT("True") )==0 )
+				if( bRemoveFromOthers )
+				{
+					UE_LOG(LogM2U, Log, TEXT("Removing Actor %s from all Others"), *ActorName);
+					TArray<FName> AllLayerNames;
+					GEditor->Layers->AddAllLayerNamesTo(AllLayerNames);
+					GEditor->Layers->RemoveActorFromLayers(Actor, AllLayerNames);
+				}
+				UE_LOG(LogM2U, Log, TEXT("Adding Actor %s to Layer %s"), *ActorName, *LayerName);
+				GEditor->Layers->AddActorToLayer(Actor, FName(*LayerName));
+			}
+		}
+		return TEXT("Ok");
+	}
+	else if( FParse::Command(&Str, TEXT("RemoveObjectsFromAllLayers")))
+	{
+		FString ActorNamesList = FParse::Token(Str,0);
+		TArray<FString> ActorNames = m2uHelper::ParseList(ActorNamesList);
+		for( FString ActorName : ActorNames )
+		{
+			AActor* Actor;
+			if( m2uHelper::GetActorByName( *ActorName, &Actor) )
+			{
+				UE_LOG(LogM2U, Log, TEXT("Removing Actor %s from all Layers."), *ActorName);
 				TArray<FName> AllLayerNames;
 				GEditor->Layers->AddAllLayerNamesTo(AllLayerNames);
 				GEditor->Layers->RemoveActorFromLayers(Actor, AllLayerNames);
 			}
-			GEditor->Layers->AddActorToLayer(Actor, FName(*LayerName));
-		}
-		return TEXT("Ok");
-	}
-	else if( FParse::Command(&Str, TEXT("RemoveObjectFromAllLayers")))
-	{
-		FString ActorName = FParse::Token(Str,0);
-		AActor* Actor;
-		if( m2uHelper::GetActorByName( *ActorName, &Actor) )
-		{
-			TArray<FName> AllLayerNames;
-			GEditor->Layers->AddAllLayerNamesTo(AllLayerNames);
-			GEditor->Layers->RemoveActorFromLayers(Actor, AllLayerNames);
 		}
 		return TEXT("Ok");
 	}
@@ -608,18 +625,21 @@ FString ExecuteCommand(const TCHAR* Str/*, Fm2uPlugin* Conn*/)
 	{
 		FString LayerName = FParse::Token(Str,0);
 		GEditor->Layers->SetLayerVisibility(FName(*LayerName), false);
+		UE_LOG(LogM2U, Log, TEXT("Hiding Layer: %s"), *LayerName);
 		return TEXT("Ok");
 	}
 	else if( FParse::Command(&Str, TEXT("UnhideLayer")))
 	{
 		FString LayerName = FParse::Token(Str,0);
 		GEditor->Layers->SetLayerVisibility(FName(*LayerName), true);
+		UE_LOG(LogM2U, Log, TEXT("Unhiding Layer: %s"), *LayerName);
 		return TEXT("Ok");
 	}
 	else if( FParse::Command(&Str, TEXT("DeleteLayer")))
 	{
 		FString LayerName = FParse::Token(Str,0);
 		GEditor->Layers->DeleteLayer(FName(*LayerName));
+		UE_LOG(LogM2U, Log, TEXT("Deleting Layer: %s"), *LayerName);
 		return TEXT("Ok");
 	}
 	else if( FParse::Command(&Str, TEXT("RenameLayer")))
@@ -627,6 +647,7 @@ FString ExecuteCommand(const TCHAR* Str/*, Fm2uPlugin* Conn*/)
 		FString OldName = FParse::Token(Str,0);
 		FString NewName = FParse::Token(Str,0);
 		GEditor->Layers->RenameLayer(FName(*OldName), FName(*NewName));
+		UE_LOG(LogM2U, Log, TEXT("Renaming Layer %s to %s"), *OldName, *NewName);
 		return TEXT("Ok");
 	}
 
@@ -637,7 +658,7 @@ FString ExecuteCommand(const TCHAR* Str/*, Fm2uPlugin* Conn*/)
 		AActor* Actor;
 		Actor = m2uHelper::AddNewActorFromAsset(
 			FString( TEXT("/Script/Engine.TextRenderActor")), Level,
-			FName(TEXT("Group")));
+			FName(TEXT("GroupTransform")));
 		Actor->GetRootComponent()->Mobility = EComponentMobility::Static;
 		((ATextRenderActor*)Actor) -> TextRender -> SetText(FString(TEXT("Invisible Group Transform")));
 		Actor->SetActorHiddenInGame(true);

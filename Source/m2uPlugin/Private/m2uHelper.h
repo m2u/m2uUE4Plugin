@@ -13,6 +13,20 @@ namespace m2uHelper
 
 
 /**
+   Parse a python-style list from a string to an array containing the contents
+   of that list.
+   The input string should look like this:
+   [name1,name2,name3,name4]
+ */
+	TArray<FString> ParseList(FString Str)
+	{
+		FString Chopped = Str.Mid(1,Str.Len()-2); // remove the brackets
+		TArray<FString> Result;
+		Chopped.ParseIntoArray( &Result, TEXT(","), false);
+		return Result;
+	}
+
+/**
    tries to find an Actor by name and makes sure it is valid.
    @param Name The name to look for
    @param OutActor This will be the found Actor or NULL
