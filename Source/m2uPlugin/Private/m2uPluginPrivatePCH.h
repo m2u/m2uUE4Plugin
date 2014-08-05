@@ -2,6 +2,7 @@
 
 #include "CoreUObject.h"
 #include "Engine.h"
+#include "Networking.h"
 
 #include "Im2uPlugin.h"
 #include "m2uPlugin.h"

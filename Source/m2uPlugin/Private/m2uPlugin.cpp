@@ -1,7 +1,7 @@
 // Copyright 1998-2014 Epic Games, Inc. All Rights Reserved.
 
 #include "m2uPluginPrivatePCH.h"
-#include "m2uPlugin.generated.inl"
+//#include "m2uPlugin.generated.inl"
 
 #include "Networking.h"
 #include "ActorEditorUtils.h"

@@ -332,6 +332,7 @@ bool GetActorByName( const TCHAR* Name, AActor** OutActor, UWorld* InWorld = NUL
 			Name = FName(TEXT("GeneratedName"));
 		}
 		AActor* Actor = FActorFactoryAssetProxy::AddActorForAsset( Asset, &Location, false, bSelectActor, ObjectFlags, NULL, Name );
+		//AActor* Actor = FActorFactoryAssetProxy::AddActorForAsset( Asset, bSelectActor, ObjectFlags, NULL, Name );
 		// The Actor will sometimes receive the Name, but not if it is a blueprint?
 		// It will never receive the name as Label, so we set the name explicitly 
 		// again here.

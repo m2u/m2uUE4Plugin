@@ -11,11 +11,11 @@ public:
 	Fm2uPlugin();
 
 	/* IModuleInterface implementation */
-	virtual void StartupModule() OVERRIDE;
-	virtual void ShutdownModule() OVERRIDE;
+	virtual void StartupModule() override;
+	virtual void ShutdownModule() override;
 
 	/* TcpListener Delegate */
-	bool HandleConnectionAccepted( FSocket* ClientSocket, const FIPv4Endpoint& ClientEndpoint);
+	bool HandleConnectionAccepted( FSocket* ClientSocket, const class FIPv4Endpoint& ClientEndpoint);
 
 	/* TickObject Delegate */
 	void Tick( float DeltaTime );
