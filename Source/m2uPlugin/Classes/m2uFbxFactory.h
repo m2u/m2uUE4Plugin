@@ -43,7 +43,7 @@ class Um2uFbxFactory : public UFbxFactory
 
 	// Begin UObject Interface
 	//virtual void CleanUp() OVERRIDE;
-	virtual bool ConfigureProperties() OVERRIDE;
+	virtual bool ConfigureProperties() override;
 	//virtual void PostInitProperties() OVERRIDE;
 	// End UObject Interface
 };

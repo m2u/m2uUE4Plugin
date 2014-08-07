@@ -1,11 +1,21 @@
 #ifndef _M2UHELPER_H_
 #define _M2UHELPER_H_
 
+// disable assignment within conditional expression error in VS
+#ifdef _MSC_VER
+#pragma warning( disable : 4706 )
+#endif
+
 #include "AssetSelection.h"
 #include "m2uAssetHelper.h"
+
+// Functions I'm currently using from this cpp file aren't exported, so they will
+// be unresolved symbols on Windows. For now importing the cpp is OK...
+// TODO: the required functions should probably be rewritten here instead.
+#include "Editor/UnrealEd/Private/ParamParser.cpp"
+
+
 // Provides functions that are used by most likely more than one command or action
-
-
 namespace m2uHelper
 {
 
@@ -221,7 +231,7 @@ bool GetActorByName( const TCHAR* Name, AActor** OutActor, UWorld* InWorld = NUL
 			}
 			else
 			{
-				ExistingObject = StaticFindObjectFastInternal( NULL, Outer, 
+				ExistingObject = StaticFindObjectFast( NULL, Outer, 
 															   TestName );
 			}
 			
@@ -325,14 +335,42 @@ bool GetActorByName( const TCHAR* Name, AActor** OutActor, UWorld* InWorld = NUL
 		if( Asset == NULL)
 			return NULL;
 
-		UClass* AssetClass = Asset->GetClass();
+		//UClass* AssetClass = Asset->GetClass();
 		
 		if( Name == NAME_None)
 		{
 			Name = FName(TEXT("GeneratedName"));
 		}
-		AActor* Actor = FActorFactoryAssetProxy::AddActorForAsset( Asset, &Location, false, bSelectActor, ObjectFlags, NULL, Name );
-		//AActor* Actor = FActorFactoryAssetProxy::AddActorForAsset( Asset, bSelectActor, ObjectFlags, NULL, Name );
+
+		const FAssetData AssetData(Asset);
+		FText ErrorMessage;
+		AActor* Actor = NULL;
+		const FRotator Rotation(0,0,0);
+		// find the first factory that can create this asset
+		for( UActorFactory* ActorFactory : GEditor->ActorFactories )
+		{
+			if( ActorFactory -> CanCreateActorFrom( AssetData, ErrorMessage) )
+			{
+				ULevel* Level = GWorld->GetCurrentLevel();
+				Actor = ActorFactory->CreateActor(Asset, Level, Location,
+												  &Rotation, ObjectFlags, Name);
+				if( Actor != NULL)
+					break;
+			}
+		}
+		
+		if( !Actor )
+			return NULL;
+
+
+		if( bSelectActor )
+		{
+			GEditor->SelectNone( false, true);
+			GEditor->SelectActor( Actor, true, true);
+		}
+		Actor->InvalidateLightingCache();
+		Actor->PostEditChange();
+
 		// The Actor will sometimes receive the Name, but not if it is a blueprint?
 		// It will never receive the name as Label, so we set the name explicitly 
 		// again here.
