@@ -345,15 +345,15 @@ bool GetActorByName( const TCHAR* Name, AActor** OutActor, UWorld* InWorld = NUL
 		const FAssetData AssetData(Asset);
 		FText ErrorMessage;
 		AActor* Actor = NULL;
-		const FRotator Rotation(0,0,0);
+		//const FRotator Rotation(0,0,0);
 		// find the first factory that can create this asset
 		for( UActorFactory* ActorFactory : GEditor->ActorFactories )
 		{
 			if( ActorFactory -> CanCreateActorFrom( AssetData, ErrorMessage) )
 			{
-				ULevel* Level = GWorld->GetCurrentLevel();
-				Actor = ActorFactory->CreateActor(Asset, Level, Location,
-												  &Rotation, ObjectFlags, Name);
+				//ULevel* Level = GWorld->GetCurrentLevel();
+				Actor = ActorFactory->CreateActor(Asset, InLevel, Location,
+												  NULL, ObjectFlags, Name);
 				if( Actor != NULL)
 					break;
 			}
@@ -374,7 +374,10 @@ bool GetActorByName( const TCHAR* Name, AActor** OutActor, UWorld* InWorld = NUL
 		// The Actor will sometimes receive the Name, but not if it is a blueprint?
 		// It will never receive the name as Label, so we set the name explicitly 
 		// again here.
-		Actor->SetActorLabel(Actor->GetFName().ToString());
+		//Actor->SetActorLabel(Actor->GetFName().ToString());
+		// For some reason, since 4.3 the factory will always create a class-based name
+		// so we have to rename the actor explicitly completely.
+		m2uHelper::RenameActor(Actor, Name.ToString());
 		
 		return Actor;
 	}// AActor* AddNewActorFromAsset()
