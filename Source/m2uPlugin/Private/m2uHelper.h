@@ -315,7 +315,6 @@ bool GetActorByName( const TCHAR* Name, AActor** OutActor, UWorld* InWorld = NUL
  * @param InLevel The Level to add the Actor to
  * @param Name The Name to assign to the Actor (should be a valid FName) or NAME_None
  * @param bSelectActor Select the Actor after it is created
- * @param Location Where to place the Actor
  *
  * @return The newly created Actor
  *
@@ -327,7 +326,6 @@ bool GetActorByName( const TCHAR* Name, AActor** OutActor, UWorld* InWorld = NUL
 								  ULevel* InLevel, 
 								  FName Name = NAME_None,
 								  bool bSelectActor = true, 
-								  const FVector& Location = FVector(0,0,0),
 								  EObjectFlags ObjectFlags = RF_Transactional)
 	{
 
@@ -344,16 +342,20 @@ bool GetActorByName( const TCHAR* Name, AActor** OutActor, UWorld* InWorld = NUL
 
 		const FAssetData AssetData(Asset);
 		FText ErrorMessage;
-		AActor* Actor = NULL;
-		//const FRotator Rotation(0,0,0);
+		AActor* Actor = NULL;	  
+
 		// find the first factory that can create this asset
 		for( UActorFactory* ActorFactory : GEditor->ActorFactories )
 		{
 			if( ActorFactory -> CanCreateActorFrom( AssetData, ErrorMessage) )
 			{
-				//ULevel* Level = GWorld->GetCurrentLevel();
-				Actor = ActorFactory->CreateActor(Asset, InLevel, Location,
+#if ENGINE_MINOR_VERSION < 4 // 4.3 etc
+				Actor = ActorFactory->CreateActor(Asset, InLevel, FVector(0,0,0),
 												  NULL, ObjectFlags, Name);
+#else // 4.4
+				Actor = ActorFactory->CreateActor(Asset, InLevel, FTransform::Identity,
+												  ObjectFlags, Name);
+#endif
 				if( Actor != NULL)
 					break;
 			}
