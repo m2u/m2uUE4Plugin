@@ -8,6 +8,7 @@
 
 #include "AssetSelection.h"
 #include "m2uAssetHelper.h"
+#include "Runtime/Launch/Resources/Version.h"
 
 // Functions I'm currently using from this cpp file aren't exported, so they will
 // be unresolved symbols on Windows. For now importing the cpp is OK...
