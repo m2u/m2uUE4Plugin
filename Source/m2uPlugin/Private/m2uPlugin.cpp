@@ -15,7 +15,8 @@
 
 DEFINE_LOG_CATEGORY( LogM2U )
 
-#define DEFAULT_M2U_ENDPOINT FIPv4Endpoint(FIPv4Address(127,0,0,1), 3939)
+// IP-Address of 0.0.0.0 listens on all local interfaces (all addresses)
+#define DEFAULT_M2U_ENDPOINT FIPv4Endpoint(FIPv4Address(0,0,0,0), 3939)
 
 IMPLEMENT_MODULE( Fm2uPlugin, m2uPlugin )
 
