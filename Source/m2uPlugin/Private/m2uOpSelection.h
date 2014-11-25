@@ -18,26 +18,22 @@ Fm2uOpSelection( Fm2uOperationManager* Manager = NULL )
 		const TCHAR* Str = *Cmd;
 		bool DidExecute = false;
 
-		if( FParse::Command(&Str, TEXT("SelectByName")))
+		if( FParse::Command(&Str, TEXT("SelectByNames")))
 		{
-			const FString ActorName = FParse::Token(Str,0);
-			UE_LOG(LogM2U, Log, TEXT("received SelectByName: %s."), 
-					   *ActorName);
-			//AActor* Actor = GEditor->SelectNamedActor(*ActorName);
-			AActor* Actor = NULL;
-			if( m2uHelper::GetActorByName(*ActorName, Actor) )
+			FString ActorNamesList = FParse::Token(Str,0);
+			TArray<FString> ActorNames = m2uHelper::ParseList(ActorNamesList);			
+			for( FString ActorName : ActorNames )
 			{
-				GEditor->SelectActor( Actor, true, true, true);// actor, select, notify, evenIfHidden
-				GEditor->RedrawLevelEditingViewports();
+				AActor* Actor;
+				if( m2uHelper::GetActorByName(*ActorName, &Actor) )
+				{
+					GEditor->SelectActor( Actor, true, true, true);// actor, select, notify, evenIfHidden
+				}			   
 			}
-			else
-			{
-				UE_LOG(LogM2U, Log, TEXT("Actor %s not found or not selectable."), 
-					   *ActorName);
-			}
-
+			GEditor->RedrawLevelEditingViewports();
 			DidExecute = true;
 		}
+
 		else if( FParse::Command(&Str, TEXT("DeselectAll")))
 		{
 			GEditor->SelectNone(true, true, false);
@@ -45,25 +41,30 @@ Fm2uOpSelection( Fm2uOperationManager* Manager = NULL )
 
 			DidExecute = true;
 		}
-		else if( FParse::Command(&Str, TEXT("DeselectByName")))
+
+		else if( FParse::Command(&Str, TEXT("DeselectByNames")))
 		{
-			const FString ActorName = FParse::Token(Str,0);
 			TArray<AActor*> SelectedActors;
 			USelection* Selection = GEditor->GetSelectedActors();
 			Selection->GetSelectedObjects<AActor>(SelectedActors);
-
-			for( int32 Idx = 0 ; Idx < SelectedActors.Num() ; ++Idx )
+			
+			FString ActorNamesList = FParse::Token(Str,0);
+			TArray<FString> ActorNames = m2uHelper::ParseList(ActorNamesList);			
+			for( FString ActorName : ActorNames )
 			{
-				AActor* Actor = SelectedActors[ Idx ];
-				if(Actor->GetFName().ToString() == ActorName)
+				for( int32 Idx = 0 ; Idx < SelectedActors.Num() ; ++Idx )
 				{
-					Selection->Modify();
-					//Selection->BeginBatchSelectOperation();
-					//Selection->Deselect(Actor);
-					//Selection->EndBatchSelectOperation();
-					GEditor->SelectActor( Actor, false, false ); // deselect
-					break;
-				}
+					AActor* Actor = SelectedActors[ Idx ];
+					if(Actor->GetFName().ToString() == ActorName)
+					{
+						Selection->Modify();
+						//Selection->BeginBatchSelectOperation();
+						//Selection->Deselect(Actor);
+						//Selection->EndBatchSelectOperation();
+						GEditor->SelectActor( Actor, false, true, true ); // deselect
+						break;
+					}
+				}	
 			}
 			GEditor->RedrawLevelEditingViewports();
 			DidExecute = true;
