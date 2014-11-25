@@ -7,6 +7,7 @@
 #include "Im2uPlugin.h"
 #include "m2uPlugin.h"
 #include "m2uTickObject.h"
+#include "m2uOperation.h"
 
 #include "m2uFbxfactory.h"
 

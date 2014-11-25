@@ -1,8 +1,6 @@
 #ifndef _M2UBATCHFILEPARSE_H_
 #define _M2UBATCHFILEPARSE_H_
 
-#include "m2uActions.h"
-
 
 /**
    this is a temporary solution to parse a file for commands that the m2u actions 
@@ -16,6 +14,8 @@ bool m2uBatchFileParse(FString& Filename)
 	FString Result;
 	if( FFileHelper::LoadFileToString(Result, *Filename) )
 	{
+		UE_LOG(LogM2U, Error, TEXT("Batch File parsing is currently not implemented"));
+		return false;
 		UE_LOG(LogM2U, Error, TEXT("Parsing File \"%s\" for commands."), *Filename);
 
 		FString ImpCmd = TEXT("ImportAssetsBatch");
@@ -28,8 +28,8 @@ bool m2uBatchFileParse(FString& Filename)
 		FString ImpBlock = Result.Mid(ImpStart, ImpLength);
 		FString AddBlock = Result.RightChop(AddStart + AddCmd.Len());
 
-		m2uActions::ImportAssetsBatch(*ImpBlock);
-		m2uActions::AddActorBatch(*AddBlock);
+		//m2uActions::ImportAssetsBatch(*ImpBlock);
+		//m2uActions::AddActorBatch(*AddBlock);
 		
 		return true;
 	}

@@ -6,12 +6,13 @@
 #include "Networking.h"
 #include "ActorEditorUtils.h"
 #include "UnrealEd.h"
-#include "Editor/UnrealEd/Private/Layers/Layers.h"
+
 #include "Runtime/Engine/Classes/Engine/TextRenderActor.h"
 
 #include "m2uHelper.h"
-#include "m2uActions.h"
 #include "m2uBatchFileParse.h"
+
+#include "m2uBuiltinOperations.h"
 
 DEFINE_LOG_CATEGORY( LogM2U )
 
@@ -43,7 +44,9 @@ void Fm2uPlugin::StartupModule()
 	TcpListener->OnConnectionAccepted().BindRaw(this, &Fm2uPlugin::HandleConnectionAccepted);
 
 	TickObject = new Fm2uTickObject(this);
-
+	
+	OperationManager = new Fm2uOperationManager();
+	CreateBuiltinOperations(OperationManager);
 }
 
 
@@ -63,6 +66,9 @@ void Fm2uPlugin::ShutdownModule()
 
 	delete TickObject;
 	TickObject = NULL;
+
+	delete OperationManager;
+	OperationManager = NULL;
 }
 
 bool Fm2uPlugin::Exec( UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar )
@@ -88,7 +94,8 @@ bool Fm2uPlugin::Exec( UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar )
 	else if( FParse::Command(&Cmd, TEXT("m2uDo")) )
 	{
 		// execute an Action without using tcp connection
-		ExecuteCommand(Cmd);
+		//ExecuteCommand(Cmd);
+		OperationManager -> Execute(FString(Cmd));
 		return true;
 	}
 	return false;
@@ -117,7 +124,10 @@ void Fm2uPlugin::Tick( float DeltaTime )
 		FString Message;	
 		if( GetMessage(Message) )
 		{
-			FString Result = ExecuteCommand(*Message);
+			//FString Result = ExecuteCommand(*Message);
+			// TODO: add batch-parse-message and execute multiple, newline-divided
+			// operations in one go
+			FString Result = OperationManager->Execute(Message);
 			SendResponse(Result);
 		}
 	}
@@ -215,444 +225,11 @@ FString GetUserInput(const FString& Problem)
 	
 }
 
-FString ExecuteCommand(const TCHAR* Str/*, Fm2uPlugin* Conn*/)
+
+// TODO: remove
+/*FString ExecuteCommand(const TCHAR* Str)
 {
-	//UE_LOG(LogM2U, Log, TEXT("Executing Command: %s"), Str);
-	if( FParse::Command(&Str, TEXT("Exec")))
-	{
-		if( GEditor->Exec(GEditor->GetEditorWorldContext().World(), Str) )
-			return TEXT("Ok");
-		else
-			return TEXT("Command unhandled.");
-	}
-
-	else if( FParse::Command(&Str, TEXT("Test")))
-	{
-		return TEXT("Hallo");
-	}
-
-	// -- SELECTION --
-	else if( FParse::Command(&Str, TEXT("SelectByName")))
-	{
-		const FString ActorName = FParse::Token(Str,0);
-		AActor* Actor = GEditor->SelectNamedActor(*ActorName);
-		GEditor->RedrawLevelEditingViewports();
-
-		return TEXT("Ok");
-	}
-	else if( FParse::Command(&Str, TEXT("DeselectAll")))
-	{
-		GEditor->SelectNone(true, true, false);
-		GEditor->RedrawLevelEditingViewports();
-
-		return TEXT("Ok");
-	}
-	else if( FParse::Command(&Str, TEXT("DeselectByName")))
-	{
-		const FString ActorName = FParse::Token(Str,0);
-		TArray<AActor*> SelectedActors;
-		USelection* Selection = GEditor->GetSelectedActors();
-		Selection->GetSelectedObjects<AActor>(SelectedActors);
-
-		for( int32 Idx = 0 ; Idx < SelectedActors.Num() ; ++Idx )
-		{
-			AActor* Actor = SelectedActors[ Idx ];
-			if(Actor->GetFName().ToString() == ActorName)
-			{
-				Selection->Modify();
-				//Selection->BeginBatchSelectOperation();
-				//Selection->Deselect(Actor);
-				//Selection->EndBatchSelectOperation();
-				GEditor->SelectActor( Actor, false, false ); // deselect
-				break;
-			}
-		}
-		GEditor->RedrawLevelEditingViewports();
-		return TEXT("Ok");
-	}
-
-
-	// -- EDITING --
-	else if( FParse::Command(&Str, TEXT("TransformObject")))
-	{
-		return m2uActions::TransformObject(Str);
-	}
-	else if( FParse::Command(&Str, TEXT("DeleteSelected")))
-	{
-		auto World = GEditor->GetEditorWorldContext().World();
-		((UUnrealEdEngine*)GEditor)->edactDeleteSelected(World);
-
-		return TEXT("Ok");
-	}
-	else if( FParse::Command(&Str, TEXT("DeleteObject")))
-	{
-		// deletion of actors in the editor is a dangerous/complex task as actors
-		// can be brushes or referenced, levels need to be dirtied and so on
-		// there are no "deleteActor" functions in the Editor, only "DeleteSelected"
-		// since in most cases a deletion is preceded by a selection, and followed by
-		// a selection change, we don't bother and just select the object to delete
-		// and use the editor function to do it.
-		// TODO: maybe we could reselect the previous selection after the delete op
-		// but this is probably in 99% of the cases not necessary
-		GEditor->SelectNone(true, true, false);
-		const FString ActorName = FParse::Token(Str,0);
-		AActor* Actor = GEditor->SelectNamedActor(*ActorName);
-		auto World = GEditor->GetEditorWorldContext().World();
-		((UUnrealEdEngine*)GEditor)->edactDeleteSelected(World);
-		
-		return TEXT("Ok");
-	}
-	else if( FParse::Command(&Str, TEXT("RenameObject")))
-	{
-		const FString ActorName = FParse::Token(Str,0);
-		// jump over the next space
-		Str = FCString::Strchr(Str,' ');
-		if( Str != NULL)
-			Str++;
-		// the desired new name
-		const FString NewName = FParse::Token(Str,0);
-
-		// find the Actor
-		AActor* Actor = NULL;
-		if(!m2uHelper::GetActorByName(*ActorName, &Actor) || Actor == NULL)
-		{
-			UE_LOG(LogM2U, Log, TEXT("Actor %s not found or invalid."), *ActorName);
-			return TEXT("1"); // NOT FOUND
-		}
-
-		// try to rename the actor
-		const FName ResultName = m2uHelper::RenameActor(Actor, NewName);
-		return ResultName.ToString();
-	}
-	else if( FParse::Command(&Str, TEXT("DuplicateObject")))
-	{
-		const FString ActorName = FParse::Token(Str,0);
-		AActor* OrigActor = NULL;
-		AActor* Actor = NULL; // the duplicate
-		//UE_LOG(LogM2U, Log, TEXT("Searching for Actor with name %s"), *ActorName);
-
-		// Find the Original to clone
-		if(!m2uHelper::GetActorByName(*ActorName, &OrigActor) || OrigActor == NULL)
-		{
-			UE_LOG(LogM2U, Log, TEXT("Actor %s not found or invalid."), *ActorName);
-			return TEXT("1"); // original not found
-		}
-
-		// jump over the next space to find the name for the Duplicate
-		Str = FCString::Strchr(Str,' ');
-		if( Str != NULL)
-			Str++;
-
-		// the name that is desired for the object
-		const FString DupName = FParse::Token(Str,0);
-
-		// TODO: enable transactions
-		//const FScopedTransaction Transaction( NSLOCTEXT("UnrealEd", "DuplicateActors", "Duplicate Actors") );
-
-		// select only the actor we want to duplicate
-		GEditor->SelectNone(true, true, false);
-		//OrigActor = GEditor->SelectNamedActor(*ActorName); // actor to duplicate
-		GEditor->SelectActor(OrigActor, true, false);
-		auto World = GEditor->GetEditorWorldContext().World();
-		// Do the duplication
-		((UUnrealEdEngine*)GEditor)->edactDuplicateSelected(World->GetCurrentLevel(), false);
-
-		// get the new actor (it will be auto-selected by the editor)
-		FSelectionIterator It( GEditor->GetSelectedActorIterator() );
-		Actor = static_cast<AActor*>( *It );
-
-		if( ! Actor )
-			return TEXT("4"); // duplication failed?
-
-		// if there are transform parameters in the command, apply them
-		m2uHelper::SetActorTransformRelativeFromText(Actor, Str);
-
-		GEditor->RedrawLevelEditingViewports();
-
-		// Try to set the actor's name to DupName
-		// NOTE: a unique name was already assigned during the actual duplicate
-		// operation, we could just return that name instead and say "the editor
-		// changed the name" but if the DupName can be taken, it will save a lot of
-		// extra work on the program side which has to find a new name otherwise.
-		//GEditor->SetActorLabelUnique( Actor, DupName );
-		m2uHelper::RenameActor(Actor, DupName);
-
-		// get the editor-set name
-		const FString AssignedName = Actor->GetFName().ToString();
-		// if it is the desired name, everything went fine, if not,
-		// send the name as a response to the caller
-		if( AssignedName == DupName )
-		{
-			//Conn->SendResponse(TEXT("0"));
-			return TEXT("0");
-		}
-		else
-		{
-			//Conn->SendResponse(FString::Printf( TEXT("3 %s"), *AssignedName ) );
-			return FString::Printf( TEXT("3 %s"), *AssignedName );
-		}
-
-	}
-
-	else if( FParse::Command(&Str, TEXT("ParentChildTo")))
-	{
-		return m2uActions::ParentChildTo(Str);
-	}
-
-
-
-	// -- VISIBILITY --
-	// also see the "edactHide..." functions
-	// these functions currently do not write to the TransactionBuffer, so won't be undoable
-	else if( FParse::Command(&Str, TEXT("HideSelected")))
-	{
-		TArray<AActor*> SelectedActors;
-		USelection* Selection = GEditor->GetSelectedActors();
-		Selection->Modify();
-		Selection->GetSelectedObjects<AActor>(SelectedActors);
-
-		for( int32 Idx = 0 ; Idx < SelectedActors.Num() ; ++Idx )
-		{
-			AActor* Actor = SelectedActors[ Idx ];
-			// Don't consider already hidden actors or the builder brush
-			if( !FActorEditorUtils::IsABuilderBrush(Actor) && !Actor->IsHiddenEd() )
-			{
-				Actor->SetIsTemporarilyHiddenInEditor( true );
-			}
-		}
-		GEditor->RedrawLevelEditingViewports();
-		return TEXT("Ok");
-	}
-	else if( FParse::Command(&Str, TEXT("UnhideSelected")))
-	{
-		TArray<AActor*> SelectedActors;
-		USelection* Selection = GEditor->GetSelectedActors();
-		Selection->Modify();
-		Selection->GetSelectedObjects<AActor>(SelectedActors);
-
-		for( int32 Idx = 0 ; Idx < SelectedActors.Num() ; ++Idx )
-		{
-			AActor* Actor = SelectedActors[ Idx ];
-			// Don't consider already visible actors or the builder brush
-			if( !FActorEditorUtils::IsABuilderBrush(Actor) && Actor->IsHiddenEd() )
-			{
-				Actor->SetIsTemporarilyHiddenInEditor( false );
-			}
-		}
-		GEditor->RedrawLevelEditingViewports();
-		return TEXT("Ok");
-	}
-	else if( FParse::Command(&Str, TEXT("IsolateSelected")))
-	{
-		// Iterate through all of the actors and hide the ones which are not selected and are not already hidden
-		auto World = GEditor->GetEditorWorldContext().World();
-		for( FActorIterator It(World); It; ++It )
-		{
-			AActor* Actor = *It;
-			if( !FActorEditorUtils::IsABuilderBrush(Actor) && !Actor->IsSelected() && !Actor->IsHiddenEd() )
-			{
-				Actor->SetIsTemporarilyHiddenInEditor( true );
-			}
-		}
-		GEditor->RedrawLevelEditingViewports();
-		return TEXT("Ok");
-	}
-	else if( FParse::Command(&Str, TEXT("UnhideAll")))
-	{
-		// Iterate through all of the actors and unhide them
-		auto World = GEditor->GetEditorWorldContext().World();
-		for( FActorIterator It(World); It; ++It )
-		{
-			AActor* Actor = *It;
-			if( !FActorEditorUtils::IsABuilderBrush(Actor) && Actor->IsTemporarilyHiddenInEditor() )
-			{
-				Actor->SetIsTemporarilyHiddenInEditor( false );
-			}
-		}
-		GEditor->RedrawLevelEditingViewports();
-		return TEXT("Ok");
-	}
-	else if( FParse::Command(&Str, TEXT("HideByNames")))
-	{
-		FString Name;
-		while( FParse::Token(Str, Name, 0) )
-		{
-			AActor* Actor = NULL;
-			if(m2uHelper::GetActorByName(*Name, &Actor) && !Actor->IsHiddenEd())
-			{
-				Actor->SetIsTemporarilyHiddenInEditor( true );
-			}
-		}
-		GEditor->RedrawLevelEditingViewports();
-		return TEXT("Ok");
-	}
-
-
-	// -- CAMERA --
-	else if( FParse::Command(&Str, TEXT("TransformCamera")))
-	{
-		/* this command is meant for viewports, not for camera Actors */
-		const TCHAR* Stream = Str;
-		FVector Loc;
-		Stream = GetFVECTORSpaceDelimited( Stream, Loc );
-		// jump over the space
-		Stream = FCString::Strchr(Stream,' ');
-		if( Stream != NULL )
-		{
-			++Stream;
-		}
-		FRotator Rot;
-		Stream = GetFROTATORSpaceDelimited( Stream, Rot, 1.0f );
-
-		if( Stream != NULL )
-		{
-			for( int32 i=0; i<GEditor->LevelViewportClients.Num(); i++ )
-			{
-				GEditor->LevelViewportClients[i]->SetViewLocation( Loc );
-				GEditor->LevelViewportClients[i]->SetViewRotation( Rot );
-			}
-		}
-		GEditor->RedrawLevelEditingViewports();
-		return TEXT("Ok");
-	}
-
-	// -- OTHER --
-	else if( FParse::Command(&Str, TEXT("Undo")))
-	{
-		GEditor->UndoTransaction();
-		return TEXT("Ok");
-	}
-	else if( FParse::Command(&Str, TEXT("Redo")))
-	{
-		GEditor->RedoTransaction();
-		return TEXT("Ok");
-	}
-	else if( FParse::Command(&Str, TEXT("GetFreeName")))
-	{
-		const FString InName = FParse::Token(Str,0);
-		FName FreeName = m2uHelper::GetFreeName(InName);
-		return FreeName.ToString();
-	}
-
-
-	// -- EXPORTING --
-
-	// fast fetching exports the selected objects simply into an fbx (or obj) file
-	else if( FParse::Command(&Str, TEXT("FetchSelected")))
-	{
-		// extract quoted file-path
-		const FString FilePath = FParse::Token(Str,0);
-		auto World = GEditor->GetEditorWorldContext().World();
-		GEditor->ExportMap(World, *FilePath, true);
-		return TEXT("Ok");
-	}
-
-
-	else if( FParse::Command(&Str, TEXT("AddActor")))
-	{
-		return m2uActions::AddActor(Str);
-	}
-	else if( FParse::Command(&Str, TEXT("AddActorBatch")))
-	{
-		return m2uActions::AddActorBatch(Str);
-	}
-
-	else if( FParse::Command(&Str, TEXT("ImportAssets")))
-	{
-		return m2uActions::ImportAssets(Str);
-	}
-	else if( FParse::Command(&Str, TEXT("ImportAssetsBatch")))
-	{
-		return m2uActions::ImportAssetsBatch(Str);
-	}
-
-	else if( FParse::Command(&Str, TEXT("ExportAsset")))
-	{
-		UE_LOG(LogM2U, Log, TEXT("Received ExportAsset: %s"), Str);
-		FString AssetName = FParse::Token(Str,0);
-		FString ExportPath = FParse::Token(Str,0);
-		m2uHelper::ExportAsset(AssetName, ExportPath);
-		return TEXT("Ok");
-	}
-
-	else if( FParse::Command(&Str, TEXT("AddObjectsToLayer")))
-	{
-		FString LayerName = FParse::Token(Str,0);
-		FString ActorNamesList = FParse::Token(Str,0);
-		bool bRemoveFromOthers = true;
-		FParse::Bool(Str, TEXT("RemoveFromOthers="), bRemoveFromOthers);
-
-		UE_LOG(LogM2U, Log, TEXT("AddObjectsToLayer received: %s %s"), *LayerName, *ActorNamesList);
-
-		TArray<FString> ActorNames = m2uHelper::ParseList(ActorNamesList);
-		for( FString ActorName : ActorNames )
-		{
-			UE_LOG(LogM2U, Log, TEXT("Actor Names List: %s"), *ActorName);
-			AActor* Actor;
-			if( m2uHelper::GetActorByName( *ActorName, &Actor) )
-			{
-				//if( FCString::Stricmp( *RemoveFromOthers, TEXT("True") )==0 )
-				if( bRemoveFromOthers )
-				{
-					UE_LOG(LogM2U, Log, TEXT("Removing Actor %s from all Others"), *ActorName);
-					TArray<FName> AllLayerNames;
-					GEditor->Layers->AddAllLayerNamesTo(AllLayerNames);
-					GEditor->Layers->RemoveActorFromLayers(Actor, AllLayerNames);
-				}
-				UE_LOG(LogM2U, Log, TEXT("Adding Actor %s to Layer %s"), *ActorName, *LayerName);
-				GEditor->Layers->AddActorToLayer(Actor, FName(*LayerName));
-			}
-		}
-		return TEXT("Ok");
-	}
-	else if( FParse::Command(&Str, TEXT("RemoveObjectsFromAllLayers")))
-	{
-		FString ActorNamesList = FParse::Token(Str,0);
-		TArray<FString> ActorNames = m2uHelper::ParseList(ActorNamesList);
-		for( FString ActorName : ActorNames )
-		{
-			AActor* Actor;
-			if( m2uHelper::GetActorByName( *ActorName, &Actor) )
-			{
-				UE_LOG(LogM2U, Log, TEXT("Removing Actor %s from all Layers."), *ActorName);
-				TArray<FName> AllLayerNames;
-				GEditor->Layers->AddAllLayerNamesTo(AllLayerNames);
-				GEditor->Layers->RemoveActorFromLayers(Actor, AllLayerNames);
-			}
-		}
-		return TEXT("Ok");
-	}
-	else if( FParse::Command(&Str, TEXT("HideLayer")))
-	{
-		FString LayerName = FParse::Token(Str,0);
-		GEditor->Layers->SetLayerVisibility(FName(*LayerName), false);
-		UE_LOG(LogM2U, Log, TEXT("Hiding Layer: %s"), *LayerName);
-		return TEXT("Ok");
-	}
-	else if( FParse::Command(&Str, TEXT("UnhideLayer")))
-	{
-		FString LayerName = FParse::Token(Str,0);
-		GEditor->Layers->SetLayerVisibility(FName(*LayerName), true);
-		UE_LOG(LogM2U, Log, TEXT("Unhiding Layer: %s"), *LayerName);
-		return TEXT("Ok");
-	}
-	else if( FParse::Command(&Str, TEXT("DeleteLayer")))
-	{
-		FString LayerName = FParse::Token(Str,0);
-		GEditor->Layers->DeleteLayer(FName(*LayerName));
-		UE_LOG(LogM2U, Log, TEXT("Deleting Layer: %s"), *LayerName);
-		return TEXT("Ok");
-	}
-	else if( FParse::Command(&Str, TEXT("RenameLayer")))
-	{
-		FString OldName = FParse::Token(Str,0);
-		FString NewName = FParse::Token(Str,0);
-		GEditor->Layers->RenameLayer(FName(*OldName), FName(*NewName));
-		UE_LOG(LogM2U, Log, TEXT("Renaming Layer %s to %s"), *OldName, *NewName);
-		return TEXT("Ok");
-	}
-
-	else if( FParse::Command(&Str, TEXT("TestActor")))
+	if( FParse::Command(&Str, TEXT("TestActor")))
 	{
 		auto World = GEditor->GetEditorWorldContext().World();
 		ULevel* Level = World->GetCurrentLevel();
@@ -680,3 +257,4 @@ FString ExecuteCommand(const TCHAR* Str/*, Fm2uPlugin* Conn*/)
 	}
 
 }
+*/

@@ -18,7 +18,7 @@
 // I can nearly point it to AssetTools.h explicitly and it won't be included...
 // so i'm doing my own stuff here for now... with black jack and hookers!
 
-namespace m2uHelper
+namespace m2uAssetHelper
 {
 
 #define LOCTEXT_NAMESPACE "AssetTools"
@@ -554,5 +554,5 @@ namespace m2uHelper
 	}// ExportAsset()
 
 
-} // namespace m2uHelper
+} // namespace m2uAssetHelper
 #endif /* _M2UASSETHELPER_H_ */

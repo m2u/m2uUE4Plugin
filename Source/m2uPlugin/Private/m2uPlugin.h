@@ -31,6 +31,7 @@ protected:
 	FSocket* Client;
 	class FTcpListener* TcpListener;
 	Fm2uTickObject* TickObject;
+	class Fm2uOperationManager* OperationManager;
 
 };
 
