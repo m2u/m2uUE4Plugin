@@ -358,7 +358,6 @@ Fm2uOpObjectDuplicate( Fm2uOperationManager* Manager = NULL )
 				//Conn->SendResponse(FString::Printf( TEXT("3 %s"), *AssignedName ) );
 				Result = FString::Printf( TEXT("3 %s"), *AssignedName );
 			}
-
 		}
 
 		else
@@ -413,6 +412,11 @@ Fm2uOpObjectAdd( Fm2uOperationManager* Manager = NULL )
    parses a string to interpret what actor to add and what properties to set
    currently only supports name and transform properties
    TODO: add support for other actors like lights and so on
+
+   If the name is already taken, a replace or edit of the existing object is
+   possible. If that is not wanted, but the name taken, a new name will be created.
+   That name will be returned to the caller. If the name result is not as desired,
+   the caller might want to rename the source-object (see object rename functions).
 */
 	FString AddActor(const TCHAR* Str)
 	{
@@ -420,9 +424,36 @@ Fm2uOpObjectAdd( Fm2uOperationManager* Manager = NULL )
 		const FString ActorName = FParse::Token(Str,0);
 		auto World = GEditor->GetEditorWorldContext().World();
 		ULevel* Level = World->GetCurrentLevel();
+		
+		// Parse additional parameters
+		bool bEditIfExists = true;
+		FParse::Bool(Str, TEXT("EditIfExists="), bEditIfExists);
+		// Note: Replacing would happen if the object to create is of a different type 
+		// than the one that already has that desired name. 
+		// it is very unlikely that in that case not simply a new name can be used
+		//bool bReplaceIfExists = false;
+		//FParse::Bool(Str, TEXT("ReplaceIfExists="), bReplaceIfExists);
 
+		// check if actor with that name already exists
+		// if so, modify or replace it (check for additional parameters for that)
 		FName ActorFName = m2uHelper::GetFreeName(ActorName);
-		AActor* Actor = AddNewActorFromAsset(AssetName, Level, ActorFName, false);
+		AActor* Actor = NULL;
+		if( (ActorFName.ToString() != ActorName) && bEditIfExists )
+		{
+			// name is taken and we want to edit the object that has the name
+			if(m2uHelper::GetActorByName( *ActorName, &Actor))
+			{
+				UE_LOG(LogM2U, Log, TEXT("Found Actor for editing: %s"), *ActorName);
+			}
+			else 
+				UE_LOG(LogM2U, Warning, TEXT("Name already taken, but no Actor with that name found: %s"), *ActorName);
+		}
+		else
+		{	
+			// name was available or we don't want to edit, so create new actor
+			Actor = AddNewActorFromAsset(AssetName, Level, ActorFName, false);
+		}
+
 		if( Actor == NULL )
 		{
 			//UE_LOG(LogM2U, Log, TEXT("failed creating from asset"));
@@ -435,6 +466,8 @@ Fm2uOpObjectAdd( Fm2uOperationManager* Manager = NULL )
 		// so set that, while we already have that actor
 		// (no need in searching it again later
 		m2uHelper::SetActorTransformRelativeFromText(Actor, Str);
+		// TODO: set other attributes
+		// TODO: set asset-reference (mesh) at least if bEdit
 
 		// TODO: we might have other property data in that string
 		// we need a function to set light radius and all that
