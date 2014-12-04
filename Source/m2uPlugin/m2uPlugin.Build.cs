@@ -37,14 +37,13 @@ namespace UnrealBuildTool.Rules
 				"Core",
 				"CoreUObject",
                 "InputCore",
-				"Slate",
                 "EditorStyle",
 				"Engine",
 				"UnrealEd",
 				"Sockets",
 				"Networking",
-					"Slate",
-					"SlateCore",
+				"Slate",
+				"SlateCore",
 					// ... add other public dependencies that you statically link with here ...
 				}
 				);

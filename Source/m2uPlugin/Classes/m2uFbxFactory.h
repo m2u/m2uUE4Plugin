@@ -39,7 +39,9 @@
 UCLASS(hidecategories=Object)
 class Um2uFbxFactory : public UFbxFactory
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+
+	Um2uFbxFactory(const FObjectInitializer& ObjectInitializer);
 
 	// Begin UObject Interface
 	//virtual void CleanUp() OVERRIDE;

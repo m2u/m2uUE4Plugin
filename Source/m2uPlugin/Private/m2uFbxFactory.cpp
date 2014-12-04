@@ -2,8 +2,8 @@
 #include "m2uPluginPrivatePCH.h"
 #include "Editor/UnrealEd/Private/FbxImporter.h"
 
-Um2uFbxFactory::Um2uFbxFactory(const class FPostConstructInitializeProperties& PCIP)
-	: Super(PCIP)
+Um2uFbxFactory::Um2uFbxFactory(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
 {
 }
 
