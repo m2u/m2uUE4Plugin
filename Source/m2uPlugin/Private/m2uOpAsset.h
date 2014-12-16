@@ -91,6 +91,14 @@ public:
 */
 	FString ImportAssets(const TCHAR* Str)
 	{
+		bool bForceNoOverwrite = false;
+		if(FParse::Bool(Str, TEXT("ForceNoOverwrite="), bForceNoOverwrite))
+		{
+			// jump over the next space
+			Str = FCString::Strchr(Str,' ');
+			if( Str != NULL)
+				Str++;
+		}
 		FString RootDestinationPath = FParse::Token(Str,0);
 		TArray<FString> Files;
 		FString AssetFile;
@@ -98,7 +106,7 @@ public:
 		{
 			Files.Add(AssetFile);
 		}
-		m2uAssetHelper::ImportAssets(Files, RootDestinationPath, false/*, &GetUserInput*/ );
+		m2uAssetHelper::ImportAssets(Files, RootDestinationPath, false, bForceNoOverwrite/*, &GetUserInput*/ );
 		return TEXT("Ok");
 	}
 
@@ -117,13 +125,21 @@ public:
 	{
 		FString AssetDestination;
 		FString AssetSource;
+		bool bForceNoOverwrite = false;
+		if(FParse::Bool(Str, TEXT("ForceNoOverwrite="), bForceNoOverwrite))
+		{
+			// jump over the next space
+			Str = FCString::Strchr(Str,' ');
+			if( Str != NULL)
+				Str++;
+		}
 		while( FParse::Token(Str, AssetDestination, 0) )
 		{
 			if( FParse::Token(Str, AssetSource, 0) )
 			{
 				TArray<FString> Files;
 				Files.Add(AssetSource);
-				m2uAssetHelper::ImportAssets(Files, AssetDestination, false/*, &GetUserInput*/);
+				m2uAssetHelper::ImportAssets(Files, AssetDestination, false, bForceNoOverwrite/*, &GetUserInput*/);
 			}
 			else // there is an uneven list of Destination<->FilePath infos
 			{

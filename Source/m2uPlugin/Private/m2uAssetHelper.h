@@ -106,6 +106,8 @@ namespace m2uAssetHelper
  * @param bUseEditorImportFunc Use the default In-Editor way of importing assets,
  *        this may create popup-dialogs for overwrite warnings. This is not what
  *        we want when controlling the Editor from Maya or so.
+ * @param bForceNoOverwrite Do not reimport the Asset if already exists. Do not
+ *        use the InputGetter to decide otherwise or so.
  * @param InputGetter a function that gets or simulates user-interaction when
  *        problems occur. See: RequestUserInputFunc()
  *
@@ -116,7 +118,7 @@ namespace m2uAssetHelper
  * although the FBX importer automatically can decide for StaticMesh or SkelMesh.
  * Therefore, whenever we import an FBX file, we will use our m2uFbxFactory explicitly
  */
-	TArray<UObject*> ImportAssets(const TArray<FString>& Files, const FString& RootDestinationPath, bool bUseEditorImportFunc = true, RequestUserInputFunc InputGetter = NULL )
+	TArray<UObject*> ImportAssets(const TArray<FString>& Files, const FString& RootDestinationPath, bool bUseEditorImportFunc = true, bool bForceNoOverwrite = false, RequestUserInputFunc InputGetter = NULL )
 	{
 		// get the FAssetTools instance from the AssetToolsModule
 		IAssetTools& AssetTools = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools").Get();
@@ -208,7 +210,7 @@ namespace m2uAssetHelper
 		// user input.
 		bool bOverwriteAll = (InputGetter == NULL) || GIsAutomationTesting;
 		bool bReplaceAll = false;
-		bool bDontOverwriteAny = false;
+		bool bDontOverwriteAny = bForceNoOverwrite;
 		bool bDontReplaceAny = (InputGetter == NULL) || GIsAutomationTesting;
 
 		// Now iterate over the input files and use the same factory object for each file with the same extension
@@ -318,7 +320,7 @@ namespace m2uAssetHelper
 					{
 						// The factory can overwrite this object, ask if that is okay, unless "Yes To All" or "No To All" was already selected
 
-						bool bWantOverwrite = bOverwriteAll;
+						bool bWantOverwrite = bOverwriteAll && !bDontOverwriteAny;
 						if( ! bOverwriteAll && ! bDontOverwriteAny )
 						{
 							FString Result = InputGetter(TEXT("Overwrite"));
@@ -553,6 +555,6 @@ namespace m2uAssetHelper
 		}
 	}// ExportAsset()
 
-
+#undef LOCTEXT_NAMESPACE
 } // namespace m2uAssetHelper
 #endif /* _M2UASSETHELPER_H_ */

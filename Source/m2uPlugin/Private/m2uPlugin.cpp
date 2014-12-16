@@ -14,10 +14,10 @@
 
 #include "m2uBuiltinOperations.h"
 
+#include "m2uUI.h"
+
 DEFINE_LOG_CATEGORY( LogM2U )
 
-// IP-Address of 0.0.0.0 listens on all local interfaces (all addresses)
-#define DEFAULT_M2U_ENDPOINT FIPv4Endpoint(FIPv4Address(0,0,0,0), 3939)
 
 IMPLEMENT_MODULE( Fm2uPlugin, m2uPlugin )
 
@@ -40,13 +40,14 @@ void Fm2uPlugin::StartupModule()
 		return;
 	}
 
-	TcpListener = new FTcpListener( DEFAULT_M2U_ENDPOINT );
-	TcpListener->OnConnectionAccepted().BindRaw(this, &Fm2uPlugin::HandleConnectionAccepted);
+	ResetConnection( DEFAULT_M2U_PORT );
 
 	TickObject = new Fm2uTickObject(this);
 	
 	OperationManager = new Fm2uOperationManager();
 	CreateBuiltinOperations(OperationManager);
+
+	m2uUI::RegisterUI();
 }
 
 
@@ -69,17 +70,21 @@ void Fm2uPlugin::ShutdownModule()
 
 	delete OperationManager;
 	OperationManager = NULL;
+
+	m2uUI::UnregisterUI();
 }
 
 bool Fm2uPlugin::Exec( UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar )
 {
 	if( FParse::Command(&Cmd, TEXT("m2uCloseConnection")) )
 	{
-		if(Client != NULL)
+		uint16 Port = DEFAULT_M2U_PORT;
+		FString PortString;
+		if( FParse::Token(Cmd, PortString, 0))
 		{
-			Client->Close();
-			Client=NULL;
+			Port = FCString::Atoi(*PortString);
 		}
+		ResetConnection(Port);
 		return true;
 	}
 	else if( FParse::Command(&Cmd, TEXT("m2uBatchFileParse")) )
@@ -101,15 +106,32 @@ bool Fm2uPlugin::Exec( UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar )
 	return false;
 }
 
+void Fm2uPlugin::ResetConnection(uint16 Port)
+{
+	if(Client != NULL)
+	{
+		Client->Close();
+		Client=NULL;
+	}
+	if(TcpListener != NULL)
+	{
+		TcpListener->Stop();
+		delete TcpListener;
+	}
+	UE_LOG(LogM2U, Log, TEXT("Hosting on Port %i"), Port);
+	TcpListener = new FTcpListener( FIPv4Endpoint(DEFAULT_M2U_ADDRESS, Port) );
+	TcpListener->OnConnectionAccepted().BindRaw(this, &Fm2uPlugin::HandleConnectionAccepted);
+}
+
 bool Fm2uPlugin::HandleConnectionAccepted( FSocket* ClientSocket, const FIPv4Endpoint& ClientEndpoint)
 {
 	if(Client==NULL)
 	{
 		Client = ClientSocket;
-		UE_LOG(LogM2U, Log, TEXT("connected on port %i"),Client->GetPortNo());
+		UE_LOG(LogM2U, Log, TEXT("Connected on Port %i"),Client->GetPortNo());
 		return true;
 	}
-	UE_LOG(LogM2U, Log, TEXT("connection declined"));
+	UE_LOG(LogM2U, Log, TEXT("Connection declined"));
 	return false;
 }
 
