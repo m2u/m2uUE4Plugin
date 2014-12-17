@@ -350,14 +350,8 @@ bool GetActorByName( const TCHAR* Name, AActor** OutActor, UWorld* InWorld = NUL
 		{
 			if( ActorFactory -> CanCreateActorFrom( AssetData, ErrorMessage) )
 			{
-// TODO: remove backwards compatibility after appropriate time
-#if ENGINE_MINOR_VERSION < 4 // 4.3 etc
-				Actor = ActorFactory->CreateActor(Asset, InLevel, FVector(0,0,0),
-												  NULL, ObjectFlags, Name);
-#else // 4.4
 				Actor = ActorFactory->CreateActor(Asset, InLevel, FTransform::Identity,
 												  ObjectFlags, Name);
-#endif
 				if( Actor != NULL)
 					break;
 			}
