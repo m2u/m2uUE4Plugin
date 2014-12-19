@@ -14,6 +14,7 @@
 #include "m2uOpSelection.h"
 #include "m2uOpTransaction.h"
 #include "m2uOpVisibility.h"
+#include "m2uOpFetch.h"
 
 void CreateBuiltinOperations( Fm2uOperationManager* Manager )
 {
@@ -40,4 +41,6 @@ void CreateBuiltinOperations( Fm2uOperationManager* Manager )
 	new Fm2uOpSelection(Manager);
 
 	new Fm2uOpVisibility(Manager);
+
+	new Fm2uOpFastFetch(Manager);
 }
