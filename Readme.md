@@ -9,9 +9,14 @@ To use the Plugin you currently will have to [build it yourself](#build). We can
 To start m2u for Unreal Engine 4 provide the init script in your Program with `"ue4"` as the second parameter.
 
 Example:
-```import m2u
+
+```
+import m2u
+
 m2u.core.initialize("maya","ue4")
-m2u.core.getProgram().ui.createUI()```
+
+m2u.core.getProgram().ui.createUI()
+```
 
 Some Videos:
 - https://vimeo.com/101552170
