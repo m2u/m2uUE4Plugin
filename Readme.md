@@ -10,11 +10,9 @@ To start m2u for Unreal Engine 4 provide the init script in your Program with `"
 
 Example:
 
-```
+``` python
 import m2u
-
 m2u.core.initialize("maya","ue4")
-
 m2u.core.getProgram().ui.createUI()
 ```
 
