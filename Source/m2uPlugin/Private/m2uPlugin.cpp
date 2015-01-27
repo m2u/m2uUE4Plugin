@@ -26,8 +26,8 @@ IMPLEMENT_MODULE( Fm2uPlugin, m2uPlugin )
 FString ExecuteCommand(const TCHAR* Str/*, Fm2uPlugin* Conn*/);
 
 Fm2uPlugin::Fm2uPlugin()
-	:TcpListener(NULL),
-	 Client(NULL)
+	:Client(NULL),
+	 TcpListener(NULL)
 {
 }
 

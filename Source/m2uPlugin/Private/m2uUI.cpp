@@ -1,6 +1,7 @@
 #include "m2uPluginPrivatePCH.h"
 #include "m2uUI.h"
 #include "m2uConfigWindow.h"
+#include "SDockTab.h"
 
 #define LOCTEXT_NAMESPACE "m2u"
 namespace m2uUI

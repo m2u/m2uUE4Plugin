@@ -6,6 +6,9 @@
 #include "ObjectTools.h"
 #include "PackageTools.h"
 #include "AssetRegistryModule.h"
+#include "NotificationManager.h"
+#include "SNotificationList.h"
+
 
 // This file contains functios that do asset-importing & exporting stuff
 // they are in big parts identical to those found in FAssetTools
@@ -159,7 +162,7 @@ namespace m2uAssetHelper
 			if( (*ClassIt)->IsChildOf(UFactory::StaticClass()) && !((*ClassIt)->HasAnyClassFlags(CLASS_Abstract)) )
 			{
 				UFactory* Factory = Cast<UFactory>( (*ClassIt)->GetDefaultObject() );
-				if( Factory->bEditorImport && Factory->ValidForCurrentGame() )
+				if( Factory->bEditorImport )
 				{
 					TArray<FString> FactoryExtensions;
 					Factory->GetSupportedFileExtensions(FactoryExtensions);

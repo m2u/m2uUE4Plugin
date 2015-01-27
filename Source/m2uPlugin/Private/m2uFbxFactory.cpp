@@ -2,8 +2,8 @@
 #include "m2uPluginPrivatePCH.h"
 #include "Editor/UnrealEd/Private/FbxImporter.h"
 
-Um2uFbxFactory::Um2uFbxFactory(const class FPostConstructInitializeProperties& PCIP)
-	: Super(PCIP)
+Um2uFbxFactory::Um2uFbxFactory(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
 {
 }
 
@@ -38,7 +38,7 @@ bool Um2uFbxFactory::ConfigureProperties()
 		ImportOptions -> NormalImportMethod = FBXNIM_ImportNormals;
 		// Static Mesh options
 		ImportOptions -> bCombineToSingle = true;
-		ImportOptions -> bReplaceVertexColors = false;
+		//ImportOptions -> bReplaceVertexColors = false;
 		ImportOptions -> bRemoveDegenerates = true;
 		ImportOptions -> bOneConvexHullPerUCX = true;
 		//ImportOptions -> StaticMeshLODGroup = FName(TEXT("LevelArchitecture"));
