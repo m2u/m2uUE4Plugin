@@ -33,7 +33,7 @@ namespace m2uHelper
 	{
 		FString Chopped = Str.Mid(1,Str.Len()-2); // remove the brackets
 		TArray<FString> Result;
-		Chopped.ParseIntoArray( &Result, TEXT(","), false);
+		Chopped.ParseIntoArray( Result, TEXT(","), false);
 		return Result;
 	}
 

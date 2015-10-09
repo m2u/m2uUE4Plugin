@@ -128,7 +128,9 @@ bool Fm2uPlugin::HandleConnectionAccepted( FSocket* ClientSocket, const FIPv4End
 	if(Client==NULL)
 	{
 		Client = ClientSocket;
-		UE_LOG(LogM2U, Log, TEXT("Connected on Port %i"),Client->GetPortNo());
+		int32 NewSize;
+		Client->SetReceiveBufferSize(4000000, NewSize);
+		UE_LOG(LogM2U, Log, TEXT("Connected on Port %i, Buffersize %i."), Client->GetPortNo(), NewSize);
 		return true;
 	}
 	UE_LOG(LogM2U, Log, TEXT("Connection declined"));
@@ -168,7 +170,7 @@ bool Fm2uPlugin::GetMessage(FString& Result)
         // create data array to read from client
 		//FArrayReaderPtr Data = MakeShareable(new FArrayReader(true));
 		FArrayReader Data;
-		Data.Init(DataSize);
+		Data.SetNumUninitialized(DataSize);
 
 		int32 BytesRead = 0;
         // read pending data into the Data array reader

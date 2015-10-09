@@ -230,6 +230,7 @@ namespace m2uAssetHelper
 			{
 				const TArray<UFactory*>& Factories = *FactoriesPtr;
 
+				//UE_LOG(LogM2U, Warning, TEXT("Found %i fbx-factories"), Factories.Num());
 				// Handle the potential of multiple factories being found
 				if( Factories.Num() > 0 )
 				{
@@ -247,19 +248,10 @@ namespace m2uAssetHelper
 							//UE_LOG(LogM2U, Warning, TEXT("Class is %s"), *(TestFactory->GetClass()->GetFName().ToString()) );
 							if( TestFactory -> GetClass() -> IsChildOf( Um2uFbxFactory::StaticClass()) )
 							{
-								UE_LOG(LogM2U, Log, TEXT("Found m2uFbxFactory"));
+								//UE_LOG(LogM2U, Log, TEXT("Found m2uFbxFactory"));
 								Factory = TestFactory;
 								break;
 							}
-						}
-
-						if( TestFactory->FactoryCanImport( Filename ) )
-						{
-							// haha, wow, we will never arrive here for FBX factories,
-							// actually, FactoryCanImport will return false
-							// for anything but .t3d, as no Factory overrides it...
-							Factory = TestFactory;
-							break;
 						}
 					}
 				}
