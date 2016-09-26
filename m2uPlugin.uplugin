@@ -3,12 +3,11 @@
 	
 	"FriendlyName" : "m2u Plugin",
 	"Version" : 1,
-	"VersionName" : "1.0",
+	"VersionName" : "1.1",
 	"CreatedBy" : "m2u",
-	"CreatedByURL" : "http://bitbucket.org/m2u",
-	"EngineVersion" : 1579795,
+	"CreatedByURL" : "http://github.com/m2u",
 	"Description" : "The m2u Plugin",
-	"Category" : "Editor.Misc",
+	"Category" : "Editor",
 	
     "Modules" :
 	[

@@ -632,10 +632,10 @@ Fm2uOpObjectParent( Fm2uOperationManager* Manager = NULL )
 		if( ParentName.Len() < 1) // no valid parent name
 		{
 			USceneComponent* ChildRoot = ChildActor->GetRootComponent();
-			if(ChildRoot->AttachParent != NULL)
+			if(ChildRoot->GetAttachParent() != NULL)
 			{
 				UE_LOG(LogM2U, Log, TEXT("Parenting %s the World."), *ChildName);
-				AActor* OldParentActor = ChildRoot->AttachParent->GetOwner();
+				AActor* OldParentActor = ChildRoot->GetAttachParent()->GetOwner();
 				OldParentActor->Modify();
 				ChildRoot->DetachFromParent(true);
 				//ChildActor->SetFolderPath(OldParentActor->GetFolderPath());

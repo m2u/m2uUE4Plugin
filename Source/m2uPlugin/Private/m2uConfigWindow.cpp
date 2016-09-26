@@ -21,7 +21,7 @@ void Sm2uConfigWindow::Construct(const FArguments& InArgs)
 				.Padding(2.0f)
 				[
 					SNew(SButton)
-					.Text( FString(TEXT("Reset Connection")) )
+					.Text( FText::FromString(FString(TEXT("Reset Connection"))) )
 					.OnClicked( this, &Sm2uConfigWindow::DoResetConnection)
 				]
 				+SHorizontalBox::Slot()
@@ -31,7 +31,7 @@ void Sm2uConfigWindow::Construct(const FArguments& InArgs)
 					SNew(SEditableTextBox)
 					.SelectAllTextWhenFocused(true)
 					.Text(this, &Sm2uConfigWindow::GetPortText)
-					.ToolTipText( FString(TEXT("The Port on which to listen.")) )
+					.ToolTipText( FText::FromString(FString(TEXT("The Port on which to listen."))) )
 					.OnTextCommitted(this, &Sm2uConfigWindow::OnPortTextChanged)
 					.OnTextChanged(this, &Sm2uConfigWindow::OnPortTextChanged, ETextCommit::Default)
 				]

@@ -25,7 +25,7 @@ public:
 	}
 
 	/* TcpListener Delegate */
-	bool HandleConnectionAccepted( FSocket* ClientSocket, const class FIPv4Endpoint& ClientEndpoint);
+	bool HandleConnectionAccepted( FSocket* ClientSocket, const struct FIPv4Endpoint& ClientEndpoint);
 
 	/* TickObject Delegate */
 	void Tick( float DeltaTime );
