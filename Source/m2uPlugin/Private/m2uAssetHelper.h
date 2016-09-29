@@ -141,7 +141,8 @@ namespace m2uAssetHelper
 
 		TArray<UObject*> ReturnObjects;
 		TMap< FString, TArray<UFactory*> > ExtensionToFactoriesMap;
-		GWarn->BeginSlowTask(LOCTEXT("ImportSlowTask", "Importing"), true);
+		FScopedSlowTask SlowTask(Files.Num() + 3, LOCTEXT("ImportSlowTask", "Importing"));
+		SlowTask.MakeDialog();
 
 		// Reset the 'Do you want to overwrite the existing object?' Yes to All /
 		// No to All prompt, to make sure the user gets a chance to select something
@@ -155,50 +156,58 @@ namespace m2uAssetHelper
 		// are valid I suppose).
 		ExpandDirectories(Files, RootDestinationPath, FilesAndDestinations);
 
+		SlowTask.EnterProgressFrame(1, LOCTEXT("Import_DeterminingImportTypes", "Determining asset types"));
 
-// First instantiate one factory for each file extension encountered that supports the extension
-		for( TObjectIterator<UClass> ClassIt; ClassIt; ++ClassIt )
+		// First instantiate one factory for each file extension encountered that supports the extension
+		// @todo import: gmp: show dialog in case of multiple matching factories
+		for (TObjectIterator<UClass> ClassIt; ClassIt; ++ClassIt)
 		{
-			if( (*ClassIt)->IsChildOf(UFactory::StaticClass()) && !((*ClassIt)->HasAnyClassFlags(CLASS_Abstract)) )
+			if (!(*ClassIt)->IsChildOf(UFactory::StaticClass()) || ((*ClassIt)->HasAnyClassFlags(CLASS_Abstract)))
 			{
-				UFactory* Factory = Cast<UFactory>( (*ClassIt)->GetDefaultObject() );
-				if( Factory->bEditorImport )
+				continue;
+			}
+
+			UFactory* Factory = Cast<UFactory>((*ClassIt)->GetDefaultObject());
+
+			if (!Factory->bEditorImport)
+			{
+				continue;
+			}
+
+			TArray<FString> FactoryExtensions;
+			Factory->GetSupportedFileExtensions(FactoryExtensions);
+
+			for (auto& FileDest : FilesAndDestinations)
+			{
+				const FString FileExtension = FPaths::GetExtension(FileDest.Key);
+
+				// Case insensitive string compare with supported formats of this factory
+				if (FactoryExtensions.Contains(FileExtension))
 				{
-					TArray<FString> FactoryExtensions;
-					Factory->GetSupportedFileExtensions(FactoryExtensions);
-					for ( auto& FileDest : FilesAndDestinations )
+					TArray<UFactory*>& ExistingFactories = ExtensionToFactoriesMap.FindOrAdd(FileExtension);
+
+					// Do not remap extensions, just reuse the existing UFactory.
+					// There may be multiple UFactories, so we will keep track of all of them
+					bool bFactoryAlreadyInMap = false;
+					for (auto FoundFactoryIt = ExistingFactories.CreateConstIterator(); FoundFactoryIt; ++FoundFactoryIt)
 					{
-						const FString FileExtension = FPaths::GetExtension(FileDest.Key);
-
-						// Case insensitive string compare with supported formats of this factory
-						if ( FactoryExtensions.Contains(FileExtension) )
+						if ((*FoundFactoryIt)->GetClass() == Factory->GetClass())
 						{
-							TArray<UFactory*>& ExistingFactories = ExtensionToFactoriesMap.FindOrAdd(FileExtension);
+							bFactoryAlreadyInMap = true;
+							break;
+						}
+					}
 
-							// Do not remap extensions, just reuse the existing UFactory.
-							// There may be multiple UFactories, so we will keep track of all of them
-							bool bFactoryAlreadyInMap = false;
-							for ( auto FoundFactoryIt = ExistingFactories.CreateConstIterator(); FoundFactoryIt; ++FoundFactoryIt )
-							{
-								if ( (*FoundFactoryIt)->GetClass() == Factory->GetClass() )
-								{
-									bFactoryAlreadyInMap = true;
-									break;
-								}
-							}
-
-							if ( !bFactoryAlreadyInMap )
-							{
-								// We found a factory for this file, it can be imported!
-								// Create a new factory of the same class and make sure it doesn't get GCed.
-								// The object will be removed from the root set at the end of this function.
-								UFactory* NewFactory = NewObject<UFactory>( nullptr, Factory->GetClass() );
-								if ( NewFactory->ConfigureProperties() )
-								{
-									NewFactory->AddToRoot();
-									ExistingFactories.Add(NewFactory);
-								}
-							}
+					if (!bFactoryAlreadyInMap)
+					{
+						// We found a factory for this file, it can be imported!
+						// Create a new factory of the same class and make sure it doesn't get GCed.
+						// The object will be removed from the root set at the end of this function.
+						UFactory* NewFactory = NewObject<UFactory>(GetTransientPackage(), Factory->GetClass());
+						if (NewFactory->ConfigureProperties())
+						{
+							NewFactory->AddToRoot();
+							ExistingFactories.Add(NewFactory);
 						}
 					}
 				}
@@ -221,6 +230,8 @@ namespace m2uAssetHelper
 		{
 			const FString& Filename = FilesAndDestinations[FileIdx].Key;
 			const FString& DestinationPath = FilesAndDestinations[FileIdx].Value;
+
+			SlowTask.EnterProgressFrame(1, FText::Format(LOCTEXT("Import_ImportingFile", "Importing \"{0}\"..."), FText::FromString(FPaths::GetBaseFilename(Filename))));
 
 			FString FileExtension = FPaths::GetExtension(Filename);
 
@@ -464,7 +475,7 @@ namespace m2uAssetHelper
 			}
 		}
 
-		GWarn->EndSlowTask();
+		SlowTask.EnterProgressFrame(1);
 
 		// Sync content browser to the newly created assets
 		if ( ReturnObjects.Num() )
