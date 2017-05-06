@@ -144,10 +144,6 @@ namespace m2uAssetHelper
 		FScopedSlowTask SlowTask(Files.Num() + 3, LOCTEXT("ImportSlowTask", "Importing"));
 		SlowTask.MakeDialog();
 
-		// Reset the 'Do you want to overwrite the existing object?' Yes to All /
-		// No to All prompt, to make sure the user gets a chance to select something
-		UFactory::ResetState();
-
 		TArray<TPair<FString, FString>> FilesAndDestinations;
 		//((FAssetTools*)&AssetTools) -> ExpandDirectories(Files, RootDestinationPath, FilesAndDestinations);
 		// NOTE: FAssetTools::ExpandDirectories will add subfolders from the
@@ -282,6 +278,10 @@ namespace m2uAssetHelper
 
 			if ( Factory != NULL )
 			{
+				// Reset the 'Do you want to overwrite the existing object?' Yes to All /
+				// No to All prompt, to make sure the user gets a chance to select something
+				Factory->ResetState();
+
 				UClass* ImportAssetType = Factory->SupportedClass;
 				bool bImportSucceeded = false;
 				bool bImportWasCancelled = false;
@@ -537,7 +537,7 @@ namespace m2uAssetHelper
 		//UObject* Asset = FindObject<UObject>( ANY_PACKAGE, *AssetPath, false );
 		UObject* Asset = StaticLoadObject(UObject::StaticClass(), NULL, *AssetPath);
 		if( Asset == NULL)
-		{			
+		{
 			UE_LOG(LogM2U, Log, TEXT("Failed to find Asset %s."), *AssetPath);
 			return NULL;
 		}
