@@ -38,38 +38,41 @@ namespace m2uHelper
 	}
 
 /**
-   tries to find an Actor by name and makes sure it is valid.
-   @param Name The name to look for
-   @param OutActor This will be the found Actor or NULL
-   @param InWorld The world in which to search for the Actor
-
-   @return true if found and valid, false otherwise
-   TODO: narrow searching to the InWorld or current world if not set.
+ *  Try to find an Actor by name.
+ *
+ *  @param Name The name to look for.
+ *  @param OutActor This will be the found Actor or `nullptr`.
+ *  @param InWorld The world in which to search for the Actor. If null,
+ *     get the current world from the Editor.
+ *
+ *  @return true if found and valid, false otherwise.
  */
-bool GetActorByName( const TCHAR* Name, AActor** OutActor, UWorld* InWorld = NULL)
+bool GetActorByName(const TCHAR* Name, AActor** OutActor, UWorld* InWorld=nullptr)
 {
-	if( InWorld == NULL)
+	if (InWorld == nullptr)
 	{
 		InWorld = GEditor->GetEditorWorldContext().World();
 	}
-	AActor* Actor;
-	Actor = FindObject<AActor>( InWorld->GetCurrentLevel(), Name, false );
-	//Actor = FindObject<AActor>( ANY_PACKAGE, Name, false );
-	// TODO: check if StaticFindObject or StaticFindObjectFastInternal is better
-	// and if searching in current world gives a perfo boost, if thats possible
-	if( Actor == NULL ) // actor with that name cannot be found
+
+	ULevel* CurrentLevel = InWorld->GetCurrentLevel();
+	FName ObjectFName = FName(Name);
+	UObject* Object;
+	Object = StaticFindObjectFast(AActor::StaticClass(), CurrentLevel, ObjectFName,
+	                              /*ExactClass=*/false, /*AnyPackage=*/false);
+	AActor* Actor = Cast<AActor>(Object);
+	if (Actor == nullptr)
 	{
+		// Actor with that name cannot be found.
 		return false;
 	}
-	else if( ! Actor->IsValidLowLevel() )
+	else if (! Actor->IsValidLowLevel())
 	{
 		//UE_LOG(LogM2U, Log, TEXT("Actor is NOT valid"));
 		return false;
 	}
 	else
 	{
-		//UE_LOG(LogM2U, Log, TEXT("Actor is valid"));
-		*OutActor=Actor;
+		*OutActor = Actor;
 		return true;
 	}
 }
