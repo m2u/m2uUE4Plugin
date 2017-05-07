@@ -23,12 +23,13 @@ namespace m2uHelper
 	const FString M2U_GENERATED_NAME(TEXT("m2uGeneratedName"));
 
 
-/**
-   Parse a python-style list from a string to an array containing the contents
-   of that list.
-   The input string should look like this:
-   [name1,name2,name3,name4]
- */
+	/**
+	 * Parse a python-style list from a string to an array containing
+	 * the contents of that list.
+	 *
+	 * The input string should look like this:
+	 * [name1,name2,name3,name4]
+	 */
 	TArray<FString> ParseList(FString Str)
 	{
 		FString Chopped = Str.Mid(1,Str.Len()-2); // remove the brackets
@@ -37,45 +38,45 @@ namespace m2uHelper
 		return Result;
 	}
 
-/**
- *  Try to find an Actor by name.
- *
- *  @param Name The name to look for.
- *  @param OutActor This will be the found Actor or `nullptr`.
- *  @param InWorld The world in which to search for the Actor. If null,
- *     get the current world from the Editor.
- *
- *  @return true if found and valid, false otherwise.
- */
-bool GetActorByName(const TCHAR* Name, AActor** OutActor, UWorld* InWorld=nullptr)
-{
-	if (InWorld == nullptr)
+	/**
+	 * Try to find an Actor by name.
+	 *
+	 * @param Name The name to look for.
+	 * @param OutActor This will be the found Actor or `nullptr`.
+	 * @param InWorld The world in which to search for the Actor. If null,
+	 *    get the current world from the Editor.
+	 *
+	 * @return true if found and valid, false otherwise.
+	 */
+	bool GetActorByName(const TCHAR* Name, AActor** OutActor, UWorld* InWorld=nullptr)
 	{
-		InWorld = GEditor->GetEditorWorldContext().World();
-	}
+		if (InWorld == nullptr)
+		{
+			InWorld = GEditor->GetEditorWorldContext().World();
+		}
 
-	ULevel* CurrentLevel = InWorld->GetCurrentLevel();
-	FName ObjectFName = FName(Name);
-	UObject* Object;
-	Object = StaticFindObjectFast(AActor::StaticClass(), CurrentLevel, ObjectFName,
-	                              /*ExactClass=*/false, /*AnyPackage=*/false);
-	AActor* Actor = Cast<AActor>(Object);
-	if (Actor == nullptr)
-	{
-		// Actor with that name cannot be found.
-		return false;
+		ULevel* CurrentLevel = InWorld->GetCurrentLevel();
+		FName ObjectFName = FName(Name);
+		UObject* Object;
+		Object = StaticFindObjectFast(AActor::StaticClass(), CurrentLevel, ObjectFName,
+		                              /*ExactClass=*/false, /*AnyPackage=*/false);
+		AActor* Actor = Cast<AActor>(Object);
+		if (Actor == nullptr)
+		{
+			// Actor with that name cannot be found.
+			return false;
+		}
+		else if (! Actor->IsValidLowLevel())
+		{
+			//UE_LOG(LogM2U, Log, TEXT("Actor is NOT valid"));
+			return false;
+		}
+		else
+		{
+			*OutActor = Actor;
+			return true;
+		}
 	}
-	else if (! Actor->IsValidLowLevel())
-	{
-		//UE_LOG(LogM2U, Log, TEXT("Actor is NOT valid"));
-		return false;
-	}
-	else
-	{
-		*OutActor = Actor;
-		return true;
-	}
-}
 
 
 	/**
@@ -147,7 +148,7 @@ bool GetActorByName(const TCHAR* Name, AActor** OutActor, UWorld* InWorld=nullpt
  * T=(x y z) R=(x y z) S=(x y z)
  * If one or more of T, R or S is not present in the String, they will be ignored.
  *
- * Relative transformations are the actual transformation values you see in the 
+ * Relative transformations are the actual transformation values you see in the
  * Editor. They are equivalent to object-space transforms in maya for example.
  *
  * Setting world-space transforms using SetActorLocation or so will yield fucked
