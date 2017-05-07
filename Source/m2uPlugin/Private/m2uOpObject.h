@@ -536,21 +536,22 @@ Fm2uOpObjectAdd( Fm2uOperationManager* Manager = NULL )
 		{
 			if (ActorFactory -> CanCreateActorFrom(AssetData, ErrorMessage))
 			{
-#if ENGINE_MINOR_VERSION < 4 // 4.3 etc
-				Actor = ActorFactory->CreateActor(Asset, InLevel, FVector(0,0,0),
-												  NULL, ObjectFlags, Name);
-#else // 4.4
-				Actor = ActorFactory->CreateActor(Asset, InLevel, FTransform::Identity,
-												  ObjectFlags, Name);
-#endif
-				if( Actor != NULL)
+				Actor = ActorFactory->CreateActor(Asset,
+												  InLevel,
+												  FTransform::Identity,
+												  ObjectFlags,
+												  Name);
+				if (Actor != nullptr)
+				{
 					break;
+				}
 			}
 		}
 
 		if (! Actor)
-			return NULL;
-
+		{
+			return nullptr;
+		}
 
 		if (bSelectActor)
 		{
