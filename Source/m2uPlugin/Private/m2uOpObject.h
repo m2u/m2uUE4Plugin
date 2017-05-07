@@ -657,7 +657,7 @@ Fm2uOpObjectParent( Fm2uOperationManager* Manager = NULL )
 				UE_LOG(LogM2U, Log, TEXT("Parenting %s the World."), *ChildName);
 				AActor* OldParentActor = ChildRoot->GetAttachParent()->GetOwner();
 				OldParentActor->Modify();
-				ChildRoot->DetachFromParent(true);
+				ChildRoot->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
 				//ChildActor->SetFolderPath(OldParentActor->GetFolderPath());
 
 				GEngine->BroadcastLevelActorDetached(ChildActor, OldParentActor);
