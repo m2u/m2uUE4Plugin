@@ -201,6 +201,40 @@ bool GetActorByName(const TCHAR* Name, AActor** OutActor, UWorld* InWorld=nullpt
 	}// void SetActorTransformRelativeFromText()
 
 
+	void SetActorTransformRelativeFromJson(AActor* Actor, TSharedPtr<FJsonObject> Data)
+	{
+		const TArray<TSharedPtr<FJsonValue>>* FloatList = nullptr;
+
+		FVector Location;
+		if (Data->TryGetArrayField(TEXT("translation"), FloatList)) {
+			Location.X = (*FloatList)[0]->AsNumber();
+			Location.Y = (*FloatList)[1]->AsNumber();
+			Location.Z = (*FloatList)[2]->AsNumber();
+			Actor->SetActorRelativeLocation(Location, false);
+		}
+		FRotator Rotation;
+		if (Data->TryGetArrayField(TEXT("rotation"), FloatList)) {
+			Rotation.Pitch = (*FloatList)[0]->AsNumber();
+			Rotation.Yaw = (*FloatList)[1]->AsNumber();
+			Rotation.Roll = (*FloatList)[2]->AsNumber();
+			Actor->SetActorRelativeRotation(Rotation, false);
+		}
+		FVector Scale;
+		if (Data->TryGetArrayField(TEXT("scale"), FloatList)) {
+			Scale.X = (*FloatList)[0]->AsNumber();
+			Scale.Y = (*FloatList)[1]->AsNumber();
+			Scale.Z = (*FloatList)[2]->AsNumber();
+			Actor->SetActorRelativeScale3D(Scale);
+		}
+
+		Actor->InvalidateLightingCache();
+		// Call PostEditMove to update components, etc.
+		Actor->PostEditMove(true);
+		Actor->CheckDefaultSubobjects();
+		// Request saves/refreshes.
+		Actor->MarkPackageDirty();
+	}
+
 
 
 } // namespace m2uHelper

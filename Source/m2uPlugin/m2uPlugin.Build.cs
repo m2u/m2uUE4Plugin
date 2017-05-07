@@ -52,6 +52,7 @@ namespace UnrealBuildTool.Rules
 				new string[]
 				{
 					"UnrealEd",
+					"Json",
 					// ... add private dependencies that you statically link with here ...
 				}
 				);

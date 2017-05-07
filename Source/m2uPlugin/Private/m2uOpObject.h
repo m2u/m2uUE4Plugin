@@ -273,94 +273,121 @@ class Fm2uOpObjectDuplicate : public Fm2uOperation
 {
 public:
 
-Fm2uOpObjectDuplicate( Fm2uOperationManager* Manager = NULL )
-	:Fm2uOperation( Manager ){}
+	Fm2uOpObjectDuplicate(Fm2uOperationManager* Manager=nullptr)
+		:Fm2uOperation(Manager){}
 
-	bool Execute( FString Cmd, FString& Result ) override
+	bool Execute(FString Cmd, FString& Result) override
 	{
 		const TCHAR* Str = *Cmd;
-		bool DidExecute = true;
+		bool DidExecute = false;
 
-		if( FParse::Command(&Str, TEXT("DuplicateObject")))
+		if (FParse::Command(&Str, TEXT("DuplicateObjects")))
 		{
-			const FString ActorName = FParse::Token(Str,0);
-			AActor* OrigActor = NULL;
-			AActor* Actor = NULL; // the duplicate
-			//UE_LOG(LogM2U, Log, TEXT("Searching for Actor with name %s"), *ActorName);
-
-			// Find the Original to clone
-			if(!m2uHelper::GetActorByName(*ActorName, &OrigActor) || OrigActor == NULL)
-			{
-				UE_LOG(LogM2U, Log, TEXT("Actor %s not found or invalid."), *ActorName);
-				Result = TEXT("1"); // original not found
+			// UE4 json reader needs an object at top level, so put
+			// our list in 'data'.
+			FString Json = TEXT("{\"data\": ") + FString(Str) + TEXT("}");
+			TSharedPtr<FJsonObject> Object;
+			auto Reader = TJsonReaderFactory<TCHAR>::Create(Json);
+			if (!FJsonSerializer::Deserialize(Reader, Object)) {
+				UE_LOG(LogM2U, Error, TEXT("Error translating Json data."));
+				return false;
+			}
+			if (!Object.IsValid()) {
+				UE_LOG(LogM2U, Error, TEXT("Translated Json object not valid."));
+				return false;
 			}
 
-			// jump over the next space to find the name for the Duplicate
-			Str = FCString::Strchr(Str,' ');
-			if( Str != NULL)
-				Str++;
-
-			// the name that is desired for the object
-			const FString DupName = FParse::Token(Str,0);
-
-			// TODO: enable transactions
-			//const FScopedTransaction Transaction( NSLOCTEXT("UnrealEd", "DuplicateActors", "Duplicate Actors") );
-
-			// select only the actor we want to duplicate
-			GEditor->SelectNone(true, true, false);
-			//OrigActor = GEditor->SelectNamedActor(*ActorName); // actor to duplicate
-			GEditor->SelectActor(OrigActor, true, false);
-			auto World = GEditor->GetEditorWorldContext().World();
-			// Do the duplication
-			((UUnrealEdEngine*)GEditor)->edactDuplicateSelected(World->GetCurrentLevel(), false);
-
-			// get the new actor (it will be auto-selected by the editor)
-			FSelectionIterator It( GEditor->GetSelectedActorIterator() );
-			Actor = static_cast<AActor*>( *It );
-
-			if( ! Actor )
-				Result = TEXT("4"); // duplication failed?
-
-			// if there are transform parameters in the command, apply them
-			m2uHelper::SetActorTransformRelativeFromText(Actor, Str);
+			const TArray<TSharedPtr<FJsonValue>>* DupInfoList = nullptr;
+			if (!Object->TryGetArrayField(TEXT("data"), DupInfoList)) {
+				return false;
+			}
+			for(auto Entry : *DupInfoList)
+			{
+				const TSharedPtr<FJsonObject>& EntryObject = Entry->AsObject();
+				FString Res = this->_DuplicateObject(EntryObject);
+				Result += " " + Res; // TODO: Res can be a space-split string already
+				// Needs some actual 'array' to string function or so.
+			}
 
 			GEditor->RedrawLevelEditingViewports();
 
-			// Try to set the actor's name to DupName
-			// NOTE: a unique name was already assigned during the actual duplicate
-			// operation, we could just return that name instead and say "the editor
-			// changed the name" but if the DupName can be taken, it will save a lot of
-			// extra work on the program side which has to find a new name otherwise.
-			//GEditor->SetActorLabelUnique( Actor, DupName );
-			Fm2uOpObjectName Renamer;
-			Renamer.RenameActor(Actor, DupName);
-
-			// get the editor-set name
-			const FString AssignedName = Actor->GetFName().ToString();
-			// if it is the desired name, everything went fine, if not,
-			// send the name as a response to the caller
-			if( AssignedName == DupName )
-			{
-				//Conn->SendResponse(TEXT("0"));
-				Result = TEXT("0");
-			}
-			else
-			{
-				//Conn->SendResponse(FString::Printf( TEXT("3 %s"), *AssignedName ) );
-				Result = FString::Printf( TEXT("3 %s"), *AssignedName );
-			}
+			DidExecute = true;
 		}
 
+		return DidExecute;
+	}
+
+	FString _DuplicateObject(TSharedPtr<FJsonObject> DupInfo)
+	{
+		FString Result;
+		const FString ActorName = DupInfo->GetStringField(TEXT("original"));
+		const FString DuplicateName = DupInfo->GetStringField(TEXT("name"));
+		AActor* OrigActor = nullptr;
+		AActor* DuplicateActor = nullptr;
+
+		// Find the Original to clone
+		if (!m2uHelper::GetActorByName(*ActorName, &OrigActor) ||
+		    OrigActor == nullptr)
+		{
+			UE_LOG(LogM2U, Warning, TEXT("Actor %s not found or invalid."),
+			       *ActorName);
+			Result = TEXT("NotFound"); // original not found
+		}
+
+		// Select only the actor we want to duplicate.
+		GEditor->SelectNone(/*notify=*/false, /*deselectBSPSurf=*/true,
+		                    /*WarnAboutManyActors=*/false);
+		GEditor->SelectActor(OrigActor, /*select=*/true, /*notify=*/false,
+		                     /*evenIfHidden=*/true);
+
+		UWorld* World = GEditor->GetEditorWorldContext().World();
+		ULevel* CurrentLevel = World->GetCurrentLevel();
+		// Do the duplication.
+		((UUnrealEdEngine*)GEditor)->edactDuplicateSelected(CurrentLevel,
+		                                                    /*bOffsetLocations=*/false);
+
+		// Get the new actor - it will be auto-selected by the editor.
+		FSelectionIterator It(GEditor->GetSelectedActorIterator());
+		DuplicateActor = static_cast<AActor*>( *It );
+
+		if (! DuplicateActor)
+		{
+			// Duplication failed.
+			Result = TEXT("Failed");
+		}
+
+		// If there are transform parameters in the command, apply them.
+		m2uHelper::SetActorTransformRelativeFromJson(DuplicateActor, DupInfo);
+
+		// Try to set the actor's name to DuplicateName
+		//
+		// Note: A unique name was already assigned during the
+		//   actual duplicate operation. We could just return that
+		//   name instead and say "the editor changed the name" but
+		//   if the DuplicateName can be used, it will save a lot
+		//   of extra work on the Program side which has to find a
+		//   new name otherwise.
+		Fm2uOpObjectName Renamer;
+		Renamer.RenameActor(DuplicateActor, DuplicateName);
+
+		// Get the editor-created name.
+		const FString AssignedName = DuplicateActor->GetFName().ToString();
+		if (AssignedName == DuplicateName)
+		{
+			// If it is the desired name, everything went fine.
+			Result = TEXT("Ok");
+		}
 		else
 		{
-// cannot handle the passed command
-			DidExecute = false;
+			// TODO: We can ask the client here for a new name by
+			//   directly sending a message back, instead of using it
+			//   as a 'result', which would then cause extra renamings
+			//   taking place after the next tick().
+			// If not, send the name as a response to the caller.
+			//Conn->SendResponse(FString::Printf( TEXT("3 %s"), *AssignedName ) );
+			Result = FString::Printf( TEXT("Renamed %s"), *AssignedName );
 		}
-
-		if( DidExecute )
-			return true;
-		else
-			return false;
+		return Result;
 	}
 };
 
