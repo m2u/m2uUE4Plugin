@@ -221,51 +221,50 @@ class Fm2uOpObjectDelete : public Fm2uOperation
 {
 public:
 
-Fm2uOpObjectDelete( Fm2uOperationManager* Manager = NULL )
-	:Fm2uOperation( Manager ){}
+	Fm2uOpObjectDelete(Fm2uOperationManager* Manager=nullptr)
+		:Fm2uOperation(Manager){}
 
-	bool Execute( FString Cmd, FString& Result ) override
+	bool Execute(FString Cmd, FString& Result) override
 	{
 		const TCHAR* Str = *Cmd;
-		bool DidExecute = true;
+		bool DidExecute = false;
 
-		if( FParse::Command(&Str, TEXT("DeleteSelected")))
+		if (FParse::Command(&Str, TEXT("DeleteSelected")))
 		{
 			auto World = GEditor->GetEditorWorldContext().World();
 			((UUnrealEdEngine*)GEditor)->edactDeleteSelected(World);
 
 			Result = TEXT("Ok");
+			DidExecute = true;
 		}
 
-		else if( FParse::Command(&Str, TEXT("DeleteObject")))
+		else if (FParse::Command(&Str, TEXT("DeleteObject")))
 		{
-			// deletion of actors in the editor is a dangerous/complex task as actors
-			// can be brushes or referenced, levels need to be dirtied and so on
-			// there are no "deleteActor" functions in the Editor, only "DeleteSelected"
-			// since in most cases a deletion is preceded by a selection, and followed by
-			// a selection change, we don't bother and just select the object to delete
-			// and use the editor function to do it.
-			// TODO: maybe we could reselect the previous selection after the delete op
-			// but this is probably in 99% of the cases not necessary
-			GEditor->SelectNone(true, true, false);
+			// Deletion of actors in the editor is a dangerous/complex
+			// task as actors can be brushes or referenced, levels
+			// need to be dirtied and so on there are no "deleteActor"
+			// functions in the Editor, only "DeleteSelected".  Since
+			// in most cases a deletion is preceded by a selection,
+			// and followed by a selection change, we don't bother and
+			// just select the object to delete and use the editor
+			// function to do it.
+			//
+			// TODO: maybe we could reselect the previous selection
+			//   after the delete op but this is probably in 99% of the
+			//   cases not necessary
+			GEditor->SelectNone(/*notify=*/false,
+								/*deselectBSPSurf=*/true,
+		                        /*WarnAboutManyActors=*/false);
 			const FString ActorName = FParse::Token(Str,0);
 			AActor* Actor = GEditor->SelectNamedActor(*ActorName);
 			auto World = GEditor->GetEditorWorldContext().World();
 			((UUnrealEdEngine*)GEditor)->edactDeleteSelected(World);
 
 			Result = TEXT("Ok");
+			DidExecute = true;
 		}
 
-		else
-		{
-// cannot handle the passed command
-			DidExecute = false;
-		}
-
-		if( DidExecute )
-			return true;
-		else
-			return false;
+		return DidExecute;
 	}
 };
 
