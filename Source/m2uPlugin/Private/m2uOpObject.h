@@ -46,7 +46,7 @@ Fm2uOpObjectTransform( Fm2uOperationManager* Manager = NULL )
 		if(!m2uHelper::GetActorByName(*ActorName, &Actor) || Actor == NULL)
 		{
 			UE_LOG(LogM2U, Log, TEXT("Actor %s not found or invalid."), *ActorName);
-			return TEXT("1");
+			return TEXT("NotFound");
 		}
 
 		m2uHelper::SetActorTransformRelativeFromText(Actor, Str);
@@ -91,7 +91,7 @@ Fm2uOpObjectName( Fm2uOperationManager* Manager = NULL )
 			if(!m2uHelper::GetActorByName(*ActorName, &Actor) || Actor == NULL)
 			{
 				UE_LOG(LogM2U, Log, TEXT("Actor %s not found or invalid."), *ActorName);
-				Result = TEXT("1"); // NOT FOUND
+				Result = TEXT("NotFound");
 			}
 
 			// try to rename the actor		  
