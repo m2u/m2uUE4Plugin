@@ -573,7 +573,9 @@ Fm2uOpObjectAdd( Fm2uOperationManager* Manager = NULL )
 
 		if( bSelectActor )
 		{
-			GEditor->SelectNone( false, true);
+			GEditor->SelectNone(/*notify=*/false,
+								/*deselectBSPSurf=*/true,
+		                        /*WarnAboutManyActors=*/false);
 			GEditor->SelectActor( Actor, true, true);
 		}
 		Actor->InvalidateLightingCache();
