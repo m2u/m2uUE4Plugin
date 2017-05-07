@@ -78,66 +78,68 @@ bool GetActorByName(const TCHAR* Name, AActor** OutActor, UWorld* InWorld=nullpt
 }
 
 
-/**
- * FName GetFreeName(const FString& Name)
- *
- * Will find a free (unused) name based on the Name string provided.
- * This will be achieved by increasing or adding a number-suffix until the
- * name is unique.
- *
- * @param Name A name string with or without a number suffix on which to build onto.
- */
+	/**
+	 * Create a string that is valid to be used as an object name by
+	 * removing all 'invalid' characters from it.
+	 */
+	FString MakeValidNameString(const FString& Name)
+	{
+		FString GeneratedName = Name;
+		for (int32 BadCharacterIndex = 0; BadCharacterIndex < ARRAY_COUNT(
+				 INVALID_OBJECTNAME_CHARACTERS) - 1; ++BadCharacterIndex)
+		{
+			const TCHAR TestChar[2] = {
+				INVALID_OBJECTNAME_CHARACTERS[BadCharacterIndex], 0 };
+			GeneratedName.ReplaceInline(TestChar, TEXT(""));
+		}
+		return GeneratedName;
+	}
+
+
+	/**
+	 * Find a free (unused) name based on the Name string provided.
+	 *
+	 * This will be achieved by increasing or adding a number-suffix
+	 * until the name is unique.
+	 *
+	 * @param Name A name string with or without a number suffix on
+	 *     which to build onto.
+	 */
 	FName GetFreeName(const FString& Name)
 	{
-		// Generate a valid FName from the String
-
-		FString GeneratedName = Name;
-		// create valid object name from the string. (remove invalid characters)
-		for( int32 BadCharacterIndex = 0; BadCharacterIndex < ARRAY_COUNT(
-				 INVALID_OBJECTNAME_CHARACTERS ) - 1; ++BadCharacterIndex )
+		FString GeneratedName = MakeValidNameString(Name);
+		// If there is no valid name left, use a default base name.
+		FName TestName(*GeneratedName);
+		if (TestName == NAME_None)
 		{
-			const TCHAR TestChar[2] = { INVALID_OBJECTNAME_CHARACTERS[
-					BadCharacterIndex ], 0 };
-			const int32 NumReplacedChars = GeneratedName.ReplaceInline( TestChar,
-																		TEXT( "" ) );
+			TestName = FName(*M2U_GENERATED_NAME);
 		}
 
-		FName TestName( *GeneratedName );
-		if( TestName == NAME_None )
-		{
-			TestName = FName( *M2U_GENERATED_NAME );
-		}
-
-		// TODO: maybe check only inside the current level or so?
-		//UObject* Outer = ANY_PACKAGE;
-		UObject* Outer = GEditor->GetEditorWorldContext().World()->GetCurrentLevel();
+		// Check only inside the current level, it is unlikely that we
+		// would be interested in names anywhere else.
+		UWorld* CurrentWorld = GEditor->GetEditorWorldContext().World();
+		ULevel* CurrentLevel = CurrentWorld->GetCurrentLevel();
 		UObject* ExistingObject;
 
-		// increase the suffix until there is no ExistingObject found
+		// Increase the suffix until there is no ExistingObject found.
 		for(;;)
 		{
-			if (Outer == ANY_PACKAGE)
+			ExistingObject = StaticFindObjectFast(AActor::StaticClass(),
+			                                      CurrentLevel, TestName,
+			                                      /*ExactClass=*/false,
+			                                      /*AnyPackage=*/false);
+			if (! ExistingObject)
 			{
-				ExistingObject = StaticFindObject( NULL, ANY_PACKAGE,
-												   *TestName.ToString() );
-			}
-			else
-			{
-				ExistingObject = StaticFindObjectFast( NULL, Outer, 
-															   TestName );
-			}
-			
-			if( ! ExistingObject ) // current name is not in use
+				// Current name is not in use.
 				break;
-			// increase suffix
-			//TestName = FName(TestName.GetIndex(), TestName.GetNumber() + 1 );
-			TestName.SetNumber( TestName.GetNumber() + 1 );
+			}
+			TestName.SetNumber(TestName.GetNumber() + 1);
 		}
 		return TestName;
 
-	}// FName GetFreeName()
+	} // FName GetFreeName()
 
-	
+
 /**
  * void SetActorTransformRelativeFromText(AActor* Actor, const TCHAR* Stream)
  *

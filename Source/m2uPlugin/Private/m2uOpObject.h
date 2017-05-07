@@ -163,19 +163,11 @@ Fm2uOpObjectName( Fm2uOperationManager* Manager = NULL )
  */
 	FName RenameActor( AActor* Actor, const FString& Name)
 	{
-		// 1. Generate a valid FName from the String
-
-		FString GeneratedName = Name;
-		// create valid object name from the string. (remove invalid characters)
-		for( int32 BadCharacterIndex = 0; BadCharacterIndex < ARRAY_COUNT( INVALID_OBJECTNAME_CHARACTERS ) - 1; ++BadCharacterIndex )
-		{
-			const TCHAR TestChar[2] = { INVALID_OBJECTNAME_CHARACTERS[ BadCharacterIndex ], 0 };
-			const int32 NumReplacedChars = GeneratedName.ReplaceInline( TestChar, TEXT( "" ) );
-		}
 		// is there still a name, or was it stripped completely (pure invalid name)
 		// we don't change the name then. The calling function should check
 		// this and maybe print an error-message or so.
 		if( GeneratedName.IsEmpty() )
+		FString GeneratedName = m2uHelper::MakeValidNameString(Name);
 		{
 			return Actor->GetFName();
 		}
