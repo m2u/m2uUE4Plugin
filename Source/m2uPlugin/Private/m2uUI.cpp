@@ -1,5 +1,6 @@
 #include "m2uPluginPrivatePCH.h"
 #include "m2uUI.h"
+#include "m2uStyleSet.h"
 #include "m2uConfigWindow.h"
 #include "SDockTab.h"
 #include "Editor/WorkspaceMenuStructure/Public/WorkspaceMenuStructureModule.h"
@@ -14,7 +15,7 @@ namespace m2uUI
 	{
 		const TSharedRef<SDockTab> Tab =
 			SNew( SDockTab )
-			.Icon( FEditorStyle::GetBrush("LiveEditor.TabIcon") )
+			.Icon( Fm2uStyleSet::Get().GetBrush("Icons.m2u") )
 			.TabRole( ETabRole::NomadTab );
 
 		Tab->SetContent( SNew( Sm2uConfigWindow ) );
@@ -28,8 +29,8 @@ namespace m2uUI
 		FGlobalTabmanager::Get()->RegisterNomadTabSpawner( m2uTabName, FOnSpawnTab::CreateStatic( &SpawnTab ) )
 			.SetDisplayName( LOCTEXT( "m2uTabTitle", "m2u" ) )
 			.SetTooltipText( LOCTEXT( "m2uTooltipText", "Open the m2u window." ))
-			.SetIcon(FSlateIcon(FEditorStyle::GetStyleSetName(), "LiveEditor.TabIcon"));
 			.SetGroup(WorkspaceMenu::GetMenuStructure().GetLevelEditorCategory())
+			.SetIcon(FSlateIcon(Fm2uStyleSet::Get().GetStyleSetName(), "Icons.m2u"));
 	}
 
 	void UnregisterUI()

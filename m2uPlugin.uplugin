@@ -8,6 +8,7 @@
 	"CreatedByURL" : "http://github.com/m2u",
 	"Description" : "The m2u Plugin",
 	"Category" : "Editor",
+	"CanContainContent" : true,
 	
     "Modules" :
 	[
