@@ -2,6 +2,8 @@
 #include "m2uUI.h"
 #include "m2uConfigWindow.h"
 #include "SDockTab.h"
+#include "Editor/WorkspaceMenuStructure/Public/WorkspaceMenuStructureModule.h"
+
 
 #define LOCTEXT_NAMESPACE "m2u"
 namespace m2uUI
@@ -26,8 +28,8 @@ namespace m2uUI
 		FGlobalTabmanager::Get()->RegisterNomadTabSpawner( m2uTabName, FOnSpawnTab::CreateStatic( &SpawnTab ) )
 			.SetDisplayName( LOCTEXT( "m2uTabTitle", "m2u" ) )
 			.SetTooltipText( LOCTEXT( "m2uTooltipText", "Open the m2u window." ))
-			//.SetGroup(WorkspaceMenu::GetMenuStructure().GetDeveloperToolsCategory())
 			.SetIcon(FSlateIcon(FEditorStyle::GetStyleSetName(), "LiveEditor.TabIcon"));
+			.SetGroup(WorkspaceMenu::GetMenuStructure().GetLevelEditorCategory())
 	}
 
 	void UnregisterUI()
