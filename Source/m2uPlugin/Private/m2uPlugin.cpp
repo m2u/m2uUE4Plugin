@@ -40,6 +40,11 @@ void Fm2uPlugin::StartupModule()
 	CreateBuiltinOperations(OperationManager);
 
 	m2uUI::RegisterUI();
+
+	// Disable the CPU throttling feature. Otherwise the Editor won't
+	// react to messages sent by m2u clients.
+	UEditorPerProjectUserSettings* Settings = GetMutableDefault<UEditorPerProjectUserSettings>();
+	Settings->bThrottleCPUWhenNotForeground = false;
 }
 
 
