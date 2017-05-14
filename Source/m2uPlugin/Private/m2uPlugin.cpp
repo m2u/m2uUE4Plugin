@@ -238,8 +238,9 @@ bool Fm2uPlugin::GetMessage(FString& Result)
 			    (char*)(Data.GetData()), Data.Num());
 			TCHAR* Dest = new TCHAR[DestLen+1];
 			Dest[DestLen] = '\0';
-			// TODO: It might be safer to first read the whole message
-			// and then convert the string.
+			// Note: It might be safer to first read the whole message
+			// and then convert to TCHAR.  But we don't handle any
+			// encoding, so this unlikely matters at the moment.
 			TStringConvert<ANSICHAR,TCHAR>::Convert(
 			    Dest, DestLen, (char*)(Data.GetData()), Data.Num());
 
@@ -269,25 +270,49 @@ bool Fm2uPlugin::GetMessage(FString& Result)
 }
 
 
-void Fm2uPlugin::SendResponse(const FString& Message)
+/**
+ * Send a message back to the client.
+ *
+ * If the client is not connected or an error occurs while sending
+ * the message, the return value will be false.
+ *
+ * A message should only be sent to the client, when it is expected.
+ * Otherwise the message may not be read from the clients input stream,
+ * causing problems with future messages.
+ */
+bool Fm2uPlugin::SendResponse(const FString& Message)
 {
-	if (this->Client != nullptr &&
-	    this->Client->GetConnectionState() == SCS_Connected)
+	if (this->Client == nullptr ||
+	    this->Client->GetConnectionState() != SCS_Connected)
 	{
-		//const uint8* Data = *Message;
-		//const int32 Count = Message.Len();
-		int32 DestLen = TStringConvert<TCHAR,ANSICHAR>::ConvertedLength(*Message, Message.Len());
-		//UE_LOG(LogM2U, Log, TEXT("DestLen will be %i"), DestLen);
-		uint8* Dest = new uint8[DestLen+1];
-		TStringConvert<TCHAR,ANSICHAR>::Convert((ANSICHAR*)Dest, DestLen, *Message, Message.Len());
-		Dest[DestLen]='\0';
-
-		int32 BytesSent = 0;
-		if(	! Client->Send( Dest, DestLen, BytesSent) )
-		{
-			UE_LOG(LogM2U, Error, TEXT("TCP Server sending answer failed."));
-		}
+		return false;
 	}
+
+	int32 DestLen = TStringConvert<TCHAR,ANSICHAR>::ConvertedLength(*Message, Message.Len());
+	uint8* Dest = new uint8[DestLen];
+	TStringConvert<TCHAR,ANSICHAR>::Convert((ANSICHAR*)Dest, DestLen, *Message, Message.Len());
+
+	// ContentLength must be sent in Big Endian (aka Network
+	// Endian), so depending on the platform, this needs to be
+	// converted.
+	int32 _ContentLength = htonl(DestLen);
+	int32 BytesSent = 0;
+	if (! Client->Send((uint8*)&_ContentLength, 4, BytesSent)){
+		UE_LOG(LogM2U, Error, TEXT("TCP Server sending answer header failed."));
+		return false;
+	}
+
+	int32 TotalBytesSent = 0;
+	while (TotalBytesSent < DestLen)
+	{
+		if (! Client->Send(Dest + TotalBytesSent, DestLen - TotalBytesSent, BytesSent))
+		{
+			UE_LOG(LogM2U, Error, TEXT("TCP Server sending answer body failed."));
+			return false;
+		}
+		TotalBytesSent += BytesSent;
+	}
+	return true;
 }
 
 
