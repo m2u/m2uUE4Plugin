@@ -1,9 +1,9 @@
 #include "m2uPluginPrivatePCH.h"
 
-#include "Networking.h"
 #include "ActorEditorUtils.h"
 #include "UnrealEd.h"
-#include "Runtime/Engine/Classes/Engine/TextRenderActor.h"
+#include "Core.h"
+#include "Runtime/Sockets/Private/BSDSockets/SocketSubsystemBSD.h"
 
 #include "m2uHelper.h"
 #include "m2uBatchFileParse.h"
@@ -11,9 +11,13 @@
 #include "m2uUI.h"
 
 
+
 DEFINE_LOG_CATEGORY( LogM2U )
 
 IMPLEMENT_MODULE( Fm2uPlugin, m2uPlugin )
+
+
+const float READ_BODY_TIMEOUT_S = 3.f;
 
 
 Fm2uPlugin::Fm2uPlugin()
@@ -130,7 +134,7 @@ bool Fm2uPlugin::HandleConnectionAccepted(FSocket* ClientSocket,
 	{
 		this->Client = ClientSocket;
 		int32 NewSize;
-		this->Client->SetReceiveBufferSize(4000000, NewSize); // TODO: set normal size
+		this->Client->SetReceiveBufferSize(4096, NewSize);
 		UE_LOG(LogM2U, Log, TEXT("Connected on Port %i, Buffersize %i."),
 		       this->Client->GetPortNo(), NewSize);
 		return true;
@@ -160,44 +164,104 @@ void Fm2uPlugin::Tick(float DeltaTime)
 
 
 /**
- * Get all data from client and create one long FString from it.
- * Return the result when the client is out of pending data.
+ * Check if there is a message from the client. When there is a
+ * message, read it completely and write it into the `Result`
+ * argument.
+ *
+ * If a message has been received, the return value will be true,
+ * false otherwise.
  */
 bool Fm2uPlugin::GetMessage(FString& Result)
 {
-	uint32 DataSize = 0;
-	while (this->Client->HasPendingData(DataSize) && DataSize > 0)
+	FArrayReader Data;  // Array for reading bytes from input stream.
+	uint32 PendingDataSize = 0;
+	int32 BytesRead = 0;
+
+	if (! this->Client->HasPendingData(PendingDataSize)) {
+		// No message in stream.
+		return false;
+	}
+
+	// Read the message header, which must be a uint32 that represents
+	// the number of bytes of the actual message.
+
+	if (PendingDataSize < 4) {
+		// We don't support reading the ContentLength header in
+		// chunks.  This should be very unlikely to happen, unless the
+		// data is not actually a header.
+		UE_LOG(LogM2U, Error, TEXT("Pending data does not contain a complete header. "
+								   "Flushing input stream."));
+		// Clear the input stream for the next message.
+		Data.SetNumUninitialized(PendingDataSize);
+		this->Client->Recv(Data.GetData(), Data.Num(), BytesRead);
+		return false;
+	}
+
+	uint32 ContentLength = 0;
+	this->Client->Recv((uint8*)&ContentLength, 4, BytesRead);
+	if (BytesRead != 4) {
+		// Not sure if this might actually happen. Recv should read
+		// exactly the 4 bytes we tell it to.
+		UE_LOG(LogM2U, Error, TEXT("Did not read complete header."));
+		return false;
+	}
+
+	// ContentLength is sent in Big Endian (aka Network Endian), so
+	// depending on the platform, this needs to be converted.
+	ContentLength = ntohl(ContentLength);
+	UE_LOG(LogM2U, Log, TEXT("Received ContentLength: %i"), ContentLength);
+
+	// Read the message body. Read only as many bytes as indicated by
+	// the header. If there is not enough data on the stream, try
+	// again until the data has been written or we time out.
+	uint32 TimeReadBodyStart = FPlatformTime::Cycles();
+	uint32 TimeReadBodyDuration = 0;
+	uint32 TotalBodyBytesRead = 0;
+	while (TotalBodyBytesRead < ContentLength)
 	{
-		//UE_LOG(LogM2U, Log, TEXT("pending data size %i"), DataSize);
-        // create data array to read from client
-		FArrayReader Data;
-		Data.SetNumUninitialized(DataSize);
-
-		int32 BytesRead = 0;
-        // Read pending data into the Data array reader.
-		if (this->Client->Recv(Data.GetData(), Data.Num(), BytesRead))
+		if (this->Client->HasPendingData(PendingDataSize) && PendingDataSize > 0)
 		{
-			//UE_LOG(LogM2U, Log, TEXT("DataNum %i, BytesRead: %i"), Data.Num(), BytesRead);
+			// If there is more data in the stream than is anticipated,
+			// make sure we don't read over the message end.
+			if (TotalBodyBytesRead + PendingDataSize > ContentLength) {
+				PendingDataSize = ContentLength - TotalBodyBytesRead;
+			}
 
-			// The data we receive is supposed to be ansi, but we will
-			// work with TCHAR, so we have to convert.
+			// Transfer the data from the stream into the array reader.
+			Data.SetNumUninitialized(PendingDataSize);
+			this->Client->Recv(Data.GetData(), Data.Num(), BytesRead);
+			TotalBodyBytesRead += BytesRead;
+
+			// The data we received should be ANSI, but we will work
+			// with TCHAR internally, so we have to convert.
 			int32 DestLen = TStringConvert<ANSICHAR,TCHAR>::ConvertedLength(
-				(char*)(Data.GetData()), Data.Num());
-			//UE_LOG(LogM2U, Log, TEXT("DestLen will be %i"), DestLen);
+			    (char*)(Data.GetData()), Data.Num());
 			TCHAR* Dest = new TCHAR[DestLen+1];
+			Dest[DestLen] = '\0';
+			// TODO: It might be safer to first read the whole message
+			// and then convert the string.
 			TStringConvert<ANSICHAR,TCHAR>::Convert(
-				Dest, DestLen, (char*)(Data.GetData()), Data.Num());
-			Dest[DestLen]='\0';
-
-			//FString Text(Dest); // FString from tchar array
-			//UE_LOG(LogM2U, Log, TEXT("server received %s"), *Text);
-			//UE_LOG(LogM2U, Log, TEXT("Server received: %s"), Dest);
+			    Dest, DestLen, (char*)(Data.GetData()), Data.Num());
 
 			Result += Dest;
-
 			delete Dest;
 		}
-	} // while
+		else
+		{
+			// If we are waiting for data for quite some time, that
+			// data may never come. Either the header was wrong, or
+			// some other mistake was made. But we have to make sure
+			// we don't hang in this loop forever.
+			TimeReadBodyDuration = FPlatformTime::ToMilliseconds(
+			    FPlatformTime::Cycles() - TimeReadBodyStart) / 1000.f;
+			if (TimeReadBodyDuration > READ_BODY_TIMEOUT_S) {
+				UE_LOG(LogM2U, Error, TEXT("Timeout while reding message body. "
+										   "ContentLength too big?"));
+				return false;
+			}
+		}
+	}
+
 	if (!Result.IsEmpty())
 		return true;
 	else
