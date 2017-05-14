@@ -130,17 +130,23 @@ void Fm2uPlugin::ResetConnection(uint16 Port)
 bool Fm2uPlugin::HandleConnectionAccepted(FSocket* ClientSocket,
                                           const FIPv4Endpoint& ClientEndpoint)
 {
-	if (this->Client == nullptr)
+	// If we have an old, maybe still used connection, close it first.
+	if (this->Client &&
+		this->Client->GetConnectionState() == SCS_Connected)
 	{
-		this->Client = ClientSocket;
-		int32 NewSize;
-		this->Client->SetReceiveBufferSize(4096, NewSize);
-		UE_LOG(LogM2U, Log, TEXT("Connected on Port %i, Buffersize %i."),
-		       this->Client->GetPortNo(), NewSize);
-		return true;
+		this->Client->Close();
 	}
-	UE_LOG(LogM2U, Log, TEXT("Connection declined"));
-	return false;
+	// Note: We accept new connections, even though the old one may
+	// still be in use. The problem is, that a proper close from the
+	// client side seems not to set the socket state to not-connected,
+	// so we don't know if the old client disconnected or not.
+
+	this->Client = ClientSocket;
+	int32 NewSize;
+	this->Client->SetReceiveBufferSize(4096, NewSize);
+	UE_LOG(LogM2U, Log, TEXT("Connected on Port %i, Buffersize %i."),
+		   this->Client->GetPortNo(), NewSize);
+	return true;
 }
 
 
