@@ -3,7 +3,7 @@
 
 #include "m2uOperation.h"
 
-#include "m2uOpHelloWorld.h"
+#include "m2uOpTests.h"
 
 #include "m2uOpAsset.h"
 #include "m2uOpCamera.h"
@@ -18,7 +18,7 @@
 
 void CreateBuiltinOperations( Fm2uOperationManager* Manager )
 {
-	new Fm2uOpHelloWorld(Manager);
+	new Fm2uOpTests(Manager);
 
 	new Fm2uOpAssetExport(Manager);
 	new Fm2uOpAssetImport(Manager);
