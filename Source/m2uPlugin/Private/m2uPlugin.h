@@ -38,7 +38,7 @@ public:
 
 	/* TCP messaging functions */
 	bool GetMessage(FString& Result);
-	void SendResponse(const FString& Message);
+	bool SendResponse(const FString& Message);
 	void ResetConnection(uint16 Port);
 
 	/* FExec implementation */
