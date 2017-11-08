@@ -31,9 +31,42 @@ public:
 
 	FString TransformObject(const TCHAR* Str)
 	{
-		const FString ActorName = FParse::Token(Str,0);
-		AActor* Actor = nullptr;
+		TSharedPtr<FJsonObject> Object;
+		auto Reader = TJsonReaderFactory<TCHAR>::Create(Str);
+		if (!FJsonSerializer::Deserialize(Reader, Object)) {
+			UE_LOG(LogM2U, Error, TEXT("Error translating Json data."));
+			return TEXT("Failed");
+		}
+		if (!Object.IsValid()) {
+			UE_LOG(LogM2U, Error, TEXT("Translated Json object not valid."));
+			return TEXT("Failed");
+		}
 
+		const TArray<TSharedPtr<FJsonValue>>* FloatList = nullptr;
+		if (!Object->TryGetArrayField(TEXT("matrix"), FloatList)) {
+			return TEXT("Failed");
+		}
+		FMatrix Matrix;
+		Matrix.M[0][0] = (*FloatList)[ 0]->AsNumber();
+		Matrix.M[0][1] = (*FloatList)[ 1]->AsNumber();
+		Matrix.M[0][2] = (*FloatList)[ 2]->AsNumber();
+		Matrix.M[0][3] = (*FloatList)[ 3]->AsNumber();
+		Matrix.M[1][0] = (*FloatList)[ 4]->AsNumber();
+		Matrix.M[1][1] = (*FloatList)[ 5]->AsNumber();
+		Matrix.M[1][2] = (*FloatList)[ 6]->AsNumber();
+		Matrix.M[1][3] = (*FloatList)[ 7]->AsNumber();
+		Matrix.M[2][0] = (*FloatList)[ 8]->AsNumber();
+		Matrix.M[2][1] = (*FloatList)[ 9]->AsNumber();
+		Matrix.M[2][2] = (*FloatList)[10]->AsNumber();
+		Matrix.M[2][3] = (*FloatList)[11]->AsNumber();
+		Matrix.M[3][0] = (*FloatList)[12]->AsNumber();
+		Matrix.M[3][1] = (*FloatList)[13]->AsNumber();
+		Matrix.M[3][2] = (*FloatList)[14]->AsNumber();
+		Matrix.M[3][3] = (*FloatList)[15]->AsNumber();
+
+		AActor* Actor = nullptr;
+		const FString ActorName = Object->GetStringField(TEXT("name"));
+		// UE_LOG(LogM2U, Error, TEXT("Would transform object %s with %s"), *ActorName, *Matrix.ToString());
 		if (!m2uHelper::GetActorByName(*ActorName, &Actor) ||
 		    Actor == nullptr)
 		{
@@ -41,10 +74,19 @@ public:
 			       *ActorName);
 			return TEXT("NotFound");
 		}
+		FTransform Transform(Matrix);
+		FVector Translation = Transform.GetTranslation();
+		Translation.Y = -Translation.Y;
+		FRotator Rotator = Transform.GetRotation().Rotator();
+		FRotator Temp = Rotator;
+		Rotator.Roll = -Temp.Roll;
+		Rotator.Pitch = Temp.Pitch;
+		Rotator.Yaw = -Temp.Yaw;
 
-		m2uHelper::SetActorTransformRelativeFromText(Actor, Str);
+		Transform.SetTranslation(Translation);
+		Transform.SetRotation(FQuat(Rotator));
 
-		GEditor->RedrawLevelEditingViewports();
+		Actor->SetActorTransform(Transform);
 		return TEXT("Ok");
 	}
 };
@@ -367,7 +409,7 @@ public:
 			//   taking place after the next tick().
 			// If not, send the name as a response to the caller.
 			// Conn->SendResponse(FString::Printf(TEXT("Renamed %s"), *AssignedName));
-			Result = FString::Printf(TEXT("Renamed %s"), *AssignedName);
+			Result = FString::Printf(TEXT("Renamed:%s"), *AssignedName);
 		}
 		return Result;
 	}
