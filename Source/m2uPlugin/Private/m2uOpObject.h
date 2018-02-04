@@ -88,10 +88,12 @@ public:
 				UE_LOG(LogM2U, Log, TEXT("Actor %s not found or invalid."), *ActorName);
 				Result = TEXT("NotFound");
 			}
-
-			// try to rename the actor
-			const FName ResultName = RenameActor(Actor, NewName);
-			Result = ResultName.ToString();
+			else
+			{
+				// try to rename the actor
+				const FName ResultName = RenameActor(Actor, NewName);
+				Result = ResultName.ToString();
+			}
 
 			DidExecute = true;
 		}
