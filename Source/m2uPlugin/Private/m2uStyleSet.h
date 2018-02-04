@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ISlateStyle.h"
+#include "Styling/ISlateStyle.h"
 
 
 class Fm2uStyleSet : public FSlateStyleSet

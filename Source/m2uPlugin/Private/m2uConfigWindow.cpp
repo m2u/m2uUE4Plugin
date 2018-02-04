@@ -1,5 +1,5 @@
-#include "m2uPluginPrivatePCH.h"
 #include "m2uConfigWindow.h"
+#include "m2uPlugin.h"
 
 DEFINE_LOG_CATEGORY_STATIC(m2uConfigWindow, Log, All);
 
@@ -45,7 +45,7 @@ FReply Sm2uConfigWindow::DoResetConnection()
 	uint16 Port = DEFAULT_M2U_PORT;
 	if( PortString.Len()>0 )
 		Port = FCString::Atoi(*PortString);
-	
+
 	Fm2uPlugin& Connection = Fm2uPlugin::Get();
 	Connection.ResetConnection(Port);
 	return FReply::Handled();

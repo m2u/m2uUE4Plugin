@@ -1,5 +1,3 @@
-#include "m2uPluginPrivatePCH.h"
-
 #include "m2uOperation.h"
 
 

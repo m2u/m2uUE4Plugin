@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Im2uPlugin.h"
+
 DECLARE_LOG_CATEGORY_EXTERN(LogM2U, Log, All);
 
 class FTcpListener;
