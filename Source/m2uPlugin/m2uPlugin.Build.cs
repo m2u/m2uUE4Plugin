@@ -4,7 +4,7 @@ namespace UnrealBuildTool.Rules
 {
 	public class m2uPlugin : ModuleRules
 	{
-		public m2uPlugin(TargetInfo Target)
+		public m2uPlugin(ReadOnlyTargetRules Target) : base(Target)
 		{			
 
 			PublicIncludePaths.AddRange(
@@ -27,9 +27,7 @@ namespace UnrealBuildTool.Rules
 				}
 				);
 
-			AddThirdPartyPrivateStaticDependencies(Target, 			
-			"FBX"
-		);
+			AddEngineThirdPartyPrivateStaticDependencies(Target, "FBX");
 
 			PublicDependencyModuleNames.AddRange(
 				new string[]
