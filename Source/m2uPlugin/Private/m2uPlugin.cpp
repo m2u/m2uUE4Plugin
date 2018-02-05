@@ -1,10 +1,13 @@
-#include "m2uPluginPrivatePCH.h"
+#include "m2uPlugin.h"
 
 #include "ActorEditorUtils.h"
 #include "UnrealEd.h"
 #include "Core.h"
 #include "Runtime/Sockets/Private/BSDSockets/SocketSubsystemBSD.h"
+#include "Networking.h"
+#include "Editor/EditorPerformanceSettings.h"
 
+#include "m2uTickObject.h"
 #include "m2uHelper.h"
 #include "m2uBatchFileParse.h"
 #include "m2uBuiltinOperations.h"
@@ -47,7 +50,7 @@ void Fm2uPlugin::StartupModule()
 
 	// Disable the CPU throttling feature. Otherwise the Editor won't
 	// react to messages sent by m2u clients.
-	UEditorPerProjectUserSettings* Settings = GetMutableDefault<UEditorPerProjectUserSettings>();
+	UEditorPerformanceSettings* Settings = GetMutableDefault<UEditorPerformanceSettings>();
 	Settings->bThrottleCPUWhenNotForeground = false;
 }
 

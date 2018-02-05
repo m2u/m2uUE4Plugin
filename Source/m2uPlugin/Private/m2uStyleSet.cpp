@@ -1,6 +1,5 @@
-#include "m2uPluginPrivatePCH.h"
 #include "m2uStyleSet.h"
-#include "IPluginManager.h"
+#include "Interfaces/IPluginManager.h"
 
 
 TSharedPtr<Fm2uStyleSet> Fm2uStyleSet::Instance;

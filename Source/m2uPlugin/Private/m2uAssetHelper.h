@@ -2,12 +2,13 @@
 #define _M2UASSETHELPER_H_
 
 #include "AssetToolsModule.h"
-#include "MessageLog.h"
+#include "Logging/MessageLog.h"
 #include "ObjectTools.h"
 #include "PackageTools.h"
 #include "AssetRegistryModule.h"
-#include "NotificationManager.h"
-#include "SNotificationList.h"
+#include "Framework/Notifications/NotificationManager.h"
+#include "Widgets/Notifications/SNotificationList.h"
+
 
 
 // This file contains functios that do asset-importing & exporting stuff

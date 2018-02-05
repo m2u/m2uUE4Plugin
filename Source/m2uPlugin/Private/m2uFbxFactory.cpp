@@ -1,6 +1,5 @@
-
-#include "m2uPluginPrivatePCH.h"
-#include "Editor/UnrealEd/Private/FbxImporter.h"
+#include "m2uFbxFactory.h"
+#include "Editor/UnrealEd/Public/FbxImporter.h"
 
 Um2uFbxFactory::Um2uFbxFactory(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
